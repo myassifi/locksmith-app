@@ -1,0 +1,389 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Heat Wave Locksmith Pro - Blue & Orange Theme */
+    --background: 0 0% 100%;
+    --foreground: 213 27% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 27% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 27% 12%;
+
+    /* Primary Blue - Professional & Trustworthy */
+    --primary: 213 94% 68%;
+    --primary-foreground: 0 0% 98%;
+    --primary-variant: 213 84% 58%;
+
+    /* Secondary Blue - Supporting accent */
+    --secondary: 213 32% 91%;
+    --secondary-foreground: 213 27% 12%;
+
+    /* Muted Blue Grays */
+    --muted: 213 27% 84%;
+    --muted-foreground: 213 27% 46%;
+
+    /* Accent Orange - Heat Wave Brand Color */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 98%;
+    --accent-hover: 25 85% 48%;
+
+    /* Success Green for healthy stock */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+
+    /* Warning Orange for low stock */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+
+    /* Destructive Red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Neutral borders */
+    --border: 213 27% 82%;
+    --input: 213 27% 82%;
+    --ring: 213 94% 68%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(213, 94%, 68%), hsl(213, 84%, 58%));
+    --gradient-accent: linear-gradient(135deg, hsl(25, 95%, 53%), hsl(25, 85%, 48%));
+    --gradient-hero: linear-gradient(135deg, hsl(213, 94%, 68%) 0%, hsl(25, 95%, 53%) 100%);
+
+    /* Shadows with brand colors */
+    --shadow-primary: 0 10px 30px -10px hsl(213 94% 68% / 0.3);
+    --shadow-accent: 0 10px 30px -10px hsl(25 95% 53% / 0.3);
+    --shadow-card: 0 4px 6px -1px hsl(213 27% 12% / 0.1);
+
+    --radius: 0.75rem;
+
+    /* Sidebar theme */
+    --sidebar-background: 213 32% 91%;
+    --sidebar-foreground: 213 27% 12%;
+    --sidebar-primary: 213 94% 68%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 213 27% 84%;
+    --sidebar-accent-foreground: 213 27% 12%;
+    --sidebar-border: 213 27% 82%;
+    --sidebar-ring: 213 94% 68%;
+  }
+
+  .dark {
+    /* Dark mode - Professional night theme */
+    --background: 213 27% 8%;
+    --foreground: 213 27% 95%;
+
+    --card: 213 27% 10%;
+    --card-foreground: 213 27% 95%;
+
+    --popover: 213 27% 10%;
+    --popover-foreground: 213 27% 95%;
+
+    --primary: 213 94% 68%;
+    --primary-foreground: 213 27% 8%;
+    --primary-variant: 213 84% 58%;
+
+    --secondary: 213 27% 15%;
+    --secondary-foreground: 213 27% 95%;
+
+    --muted: 213 27% 15%;
+    --muted-foreground: 213 27% 65%;
+
+    --accent: 25 95% 53%;
+    --accent-foreground: 213 27% 8%;
+    --accent-hover: 25 85% 48%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 213 27% 20%;
+    --input: 213 27% 20%;
+    --ring: 213 94% 68%;
+
+    /* Dark mode sidebar */
+    --sidebar-background: 213 27% 6%;
+    --sidebar-foreground: 213 27% 95%;
+    --sidebar-primary: 213 94% 68%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 213 27% 15%;
+    --sidebar-accent-foreground: 213 27% 95%;
+    --sidebar-border: 213 27% 15%;
+    --sidebar-ring: 213 94% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Heat Wave Locksmith Pro - Enhanced Design System */
+@layer utilities {
+  /* Professional card styles */
+  .pro-card {
+    @apply bg-card/95 backdrop-blur-sm border border-border/50 shadow-card rounded-xl;
+  }
+  
+  .stat-card {
+    @apply pro-card hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1;
+  }
+  
+  .stat-card-primary {
+    @apply bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 hover:border-primary/40;
+  }
+  
+  .stat-card-success {
+    @apply bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20 hover:border-green-500/40;
+  }
+  
+  .stat-card-warning {
+    @apply bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 hover:border-yellow-500/40;
+  }
+  
+  .stat-card-accent {
+    @apply bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20 hover:border-accent/40;
+  }
+  
+  /* Stock status indicators */
+  .stock-healthy {
+    @apply text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-300;
+  }
+  
+  .stock-warning {
+    @apply text-warning bg-warning/10 dark:bg-warning/20;
+  }
+  
+  .stock-critical {
+    @apply text-destructive bg-destructive/10 dark:bg-destructive/20;
+  }
+  
+  /* Mobile-first responsive utilities */
+  .mobile-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+  
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+  
+  .mobile-stats-grid {
+    @apply grid grid-cols-2 lg:grid-cols-4 gap-4;
+  }
+  
+  .mobile-card {
+    @apply p-4 sm:p-6;
+  }
+  
+  .mobile-text {
+    @apply text-sm sm:text-base;
+  }
+  
+  .mobile-heading {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+  
+  /* Professional button styles */
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-primary-variant hover:from-primary-variant hover:to-primary text-primary-foreground shadow-primary;
+  }
+  
+  .btn-accent {
+    @apply bg-gradient-to-r from-accent to-accent-hover hover:from-accent-hover hover:to-accent text-accent-foreground shadow-accent;
+  }
+  
+  /* Touch-friendly interactions */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+  
+  .tap-highlight {
+    @apply transition-all duration-200 active:scale-95 active:brightness-95;
+  }
+  
+  /* Professional animations */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+  
+  .slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+  
+  .scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+  
+  .hover-lift {
+    @apply transition-all duration-300 ease-out hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .pulse-success {
+    animation: pulseSuccess 2s ease-in-out infinite;
+  }
+  
+  /* Mobile sticky elements */
+  .mobile-sticky {
+    @apply sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b;
+  }
+  
+  .floating-action {
+    @apply fixed bottom-20 right-4 z-40 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110;
+  }
+  
+  /* Card view toggles */
+  .view-toggle {
+    @apply inline-flex items-center justify-center rounded-lg border border-border bg-card p-1;
+  }
+  
+  .view-toggle-item {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+  
+  .view-toggle-active {
+    @apply bg-primary text-primary-foreground shadow-sm;
+  }
+  
+  /* Quantity indicators */
+  .quantity-healthy {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 border-green-200 dark:border-green-800;
+  }
+  
+  .quantity-warning {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800;
+  }
+  
+  .quantity-critical {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 border-red-200 dark:border-red-800;
+  }
+  
+  /* Professional loading states */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--muted)),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}
+
+/* Scrollbar styling for webkit browsers */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Professional animations */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(100%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    transform: scale(0.95); 
+    opacity: 0; 
+  }
+  to { 
+    transform: scale(1); 
+    opacity: 1; 
+  }
+}
+
+@keyframes pulseSuccess {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.8; 
+    transform: scale(1.02); 
+  }
+}
+
+@keyframes shimmer {
+  0% { 
+    background-position: -200% 0; 
+  }
+  100% { 
+    background-position: 200% 0; 
+  }
+}
+
+/* Mobile bottom navigation */
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t;
+  }
+}
+
+/* Mobile-First Touch Targets & Safe Areas */
+@layer utilities {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+}
