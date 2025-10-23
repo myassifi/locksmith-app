@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, DollarSign, Plus, Clock, CheckCircle, TrendingUp, Calendar, AlertCircle, RefreshCw, FileText, Users, Package, Download, AlertTriangle, Info, CheckCircle2, X, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Briefcase, DollarSign, Plus, Clock, CheckCircle, TrendingUp, Calendar, AlertCircle, RefreshCw, FileText, Users, Package, Download, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,16 +14,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Job {
   id: string;
   customer_name: string;
   service_type: string;
   status: 'pending' | 'in_progress' | 'completed';
-  total_amount: number;
+  price: number;
   created_at: string;
+  job_date?: string; // optional scheduled date
 }
 
 interface DashboardData {
@@ -49,9 +50,48 @@ interface DashboardData {
   // Simple chart data
   weeklyIncome: Array<{ date: string; amount: number }>;
   jobStatus: Array<{ status: string; count: number }>;
+  
+  // New analytics
+  monthlyIncomeSeries: Array<{ month: string; amount: number }>;
+  serviceDistribution: Array<{ type: string; count: number }>;
+  
+  // Financial analytics
+  financial: {
+    inventoryInvestment: number; // Total money invested in inventory
+    monthlyAnalysis: Array<{
+      month: string;
+      materialCost: number;
+      revenue: number;
+      profit: number;
+      profitMargin: number;
+      jobCount: number;
+    }>;
+  };
+  
+  // Reminders widget data
+  reminders: {
+    upcomingJobs: Job[];
+    lowStock: Array<{ id: string; key_type: string; sku: string; quantity: number; low_stock_threshold: number }>;
+  };
 }
 
 type DateRange = 'today' | 'week' | 'month' | 'lastMonth' | 'all';
+
+// Job type mappings (same as in Jobs.tsx)
+const jobTypes = [
+  { value: 'spare_key', label: 'Spare Key' },
+  { value: 'all_keys_lost', label: 'All Keys Lost' },
+  { value: 'car_unlock', label: 'Car Unlock' },
+  { value: 'smart_key_programming', label: 'Smart Key Programming' },
+  { value: 'house_rekey', label: 'House Rekey' },
+  { value: 'lock_repair', label: 'Lock Repair' },
+  { value: 'lock_installation', label: 'Lock Installation' },
+  { value: 'other', label: 'Other' }
+];
+
+const formatJobType = (type: string) => {
+  return jobTypes.find(jt => jt.value === type)?.label || type;
+};
 
 const getDateRangeFilter = (range: DateRange) => {
   const now = new Date();
@@ -86,20 +126,38 @@ const getDateRangeFilter = (range: DateRange) => {
 
 const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<DashboardData> => {
     try {
-      // Fetch all jobs data
-      let query = supabase.from('jobs').select('*');
-      
-      // Apply date range filter if not 'all'
-      const dateFilter = getDateRangeFilter(dateRange);
-      if (dateFilter) {
-        query = query
-          .gte('created_at', dateFilter.start.toISOString())
-          .lte('created_at', dateFilter.end.toISOString());
+      // ALWAYS fetch all jobs with customer data for proper calculations
+      const { data: allJobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customers (
+            id,
+            name,
+            phone,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (jobsError) {
+        console.error('Error fetching jobs:', jobsError);
+        throw jobsError;
       }
       
-      const { data: allJobs, error: jobsError } = await query.order('created_at', { ascending: false });
+      // Debug: Log the first job to see the structure
+      if (allJobs && allJobs.length > 0) {
+        console.log('Sample job data:', allJobs[0]);
+      }
 
-      if (jobsError) throw jobsError;
+      // Fetch inventory for financial analytics
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('quantity, cost');
+
+      if (inventoryError) {
+        console.error('Error fetching inventory:', inventoryError);
+      }
 
       // Calculate job metrics
       const now = new Date();
@@ -119,14 +177,14 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const today = allJobs
         ?.filter(job => job.status === 'completed' && isToday(new Date(job.created_at)))
         .reduce((sum, job) => {
-          const amount = Number(job.total_amount) || 0;
+          const amount = Number(job.price) || 0;
           return sum + amount;
         }, 0) || 0;
 
       const thisMonthIncome = allJobs
         ?.filter(job => job.status === 'completed' && isThisMonth(new Date(job.created_at)))
         .reduce((sum, job) => {
-          const amount = Number(job.total_amount) || 0;
+          const amount = Number(job.price) || 0;
           return sum + amount;
         }, 0) || 0;
 
@@ -138,14 +196,14 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
                  jobDate.getFullYear() === lastMonth.getFullYear();
         })
         .reduce((sum, job) => {
-          const amount = Number(job.total_amount) || 0;
+          const amount = Number(job.price) || 0;
           return sum + amount;
         }, 0) || 0;
 
       const totalIncome = allJobs
         ?.filter(job => job.status === 'completed')
         .reduce((sum, job) => {
-          const amount = Number(job.total_amount) || 0;
+          const amount = Number(job.price) || 0;
           return sum + amount;
         }, 0) || 0;
       
@@ -169,7 +227,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         return {
           date: format(date, 'EEE'),
           amount: dayJobs.reduce((sum, job) => {
-            const amount = Number(job.total_amount) || 0;
+            const amount = Number(job.price) || 0;
             return sum + amount;
           }, 0)
         };
@@ -181,6 +239,92 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         { status: 'In Progress', count: inProgressJobs },
         { status: 'Pending', count: pendingJobs },
       ].filter(item => item.count > 0);
+
+      // Monthly income series for last 6 months
+      const monthsBack = 6;
+      const monthlyIncomeSeries = Array.from({ length: monthsBack }, (_, idx) => {
+        const monthDate = subMonths(new Date(), monthsBack - 1 - idx);
+        const start = startOfMonth(monthDate);
+        const end = endOfMonth(monthDate);
+        const amt = (allJobs || [])
+          .filter(j => j.status === 'completed')
+          .filter(j => {
+            const dt = new Date(j.created_at);
+            return dt >= start && dt <= end;
+          })
+          .reduce((sum, j) => sum + (Number(j.price) || 0), 0);
+        return { month: format(start, 'MMM'), amount: amt };
+      });
+
+      // Service distribution by job_type
+      const serviceMap = new Map<string, number>();
+      (allJobs || []).forEach((j: any) => {
+        const type = j.job_type || 'other';
+        const displayType = formatJobType(type);
+        serviceMap.set(displayType, (serviceMap.get(displayType) || 0) + 1);
+      });
+      const serviceDistribution = Array.from(serviceMap.entries())
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count);
+      
+      console.log('Service distribution:', serviceDistribution);
+
+      // Reminders: upcoming jobs (next 7 days) and low stock inventory
+      const nowDt = new Date();
+      const sevenDaysOut = new Date();
+      sevenDaysOut.setDate(nowDt.getDate() + 7);
+
+      const upcomingJobs = (allJobs || [])
+        .filter(j => (j.status !== 'completed'))
+        .filter(j => {
+          const when = j.job_date ? new Date(j.job_date) : new Date(j.created_at);
+          return when >= new Date(nowDt.setHours(0,0,0,0)) && when <= sevenDaysOut;
+        })
+        .sort((a, b) => new Date(a.job_date || a.created_at).getTime() - new Date(b.job_date || b.created_at).getTime())
+        .slice(0, 5);
+
+      // Calculate Financial Analytics
+      // 1. Total Inventory Investment
+      const inventoryInvestment = (inventoryData || []).reduce((sum: number, item: any) => {
+        const quantity = Number(item.quantity) || 0;
+        const cost = Number(item.cost) || 0;
+        return sum + (quantity * cost);
+      }, 0);
+
+      // 2. Monthly Profit Analysis (last 6 months)
+      const monthlyAnalysis = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthStart = startOfMonth(subMonths(new Date(), i));
+        const monthEnd = endOfMonth(monthStart);
+        
+        const monthJobs = (allJobs || []).filter((j: any) => {
+          const jobDate = new Date(j.created_at);
+          return j.status === 'completed' && jobDate >= monthStart && jobDate <= monthEnd;
+        });
+
+        const materialCost = monthJobs.reduce((sum: number, j: any) => sum + (Number(j.material_cost) || 0), 0);
+        const revenue = monthJobs.reduce((sum: number, j: any) => sum + (Number(j.price) || 0), 0);
+        const profit = revenue - materialCost;
+        const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+        monthlyAnalysis.push({
+          month: format(monthStart, 'MMM yyyy'),
+          materialCost,
+          revenue,
+          profit,
+          profitMargin,
+          jobCount: monthJobs.length
+        });
+      }
+
+      // Fetch minimal inventory for low-stock alerts
+      const { data: lowStockInventory } = await supabase
+        .from('inventory')
+        .select('id,key_type,sku,quantity,low_stock_threshold');
+
+      const lowStock = (lowStockInventory || [])
+        .filter((i: any) => typeof i.low_stock_threshold === 'number' && typeof i.quantity === 'number' && i.quantity <= i.low_stock_threshold)
+        .slice(0, 5);
 
       // Set dashboard data
       const dashboardData: DashboardData = {
@@ -198,17 +342,43 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
           inProgress: inProgressJobs,
           completed: completedJobs,
           completionRate,
-          recent: allJobs?.slice(0, 5).map(job => ({
-            id: job.id,
-            customer_name: job.customer_name || 'Unknown',
-            service_type: job.service_type || 'Service',
-            status: job.status || 'pending',
-            total_amount: job.total_amount || 0,
-            created_at: job.created_at
-          })) || [],
+          recent: (allJobs || []).slice(0, 5).map((job: any) => {
+            // Get customer name from the joined customers table
+            const customerName = job.customers?.name || 'Unknown Customer';
+            
+            // Convert job_type enum to display format using the same mapping as Jobs.tsx
+            const serviceType = formatJobType(job.job_type || 'other');
+            
+            console.log('Job customer data:', { 
+              job_id: job.id, 
+              customer_from_join: job.customers,
+              customer_name: customerName,
+              job_type: job.job_type,
+              service_type: serviceType
+            });
+            
+            return {
+              id: job.id,
+              customer_name: customerName,
+              service_type: serviceType,
+              status: (job.status || 'pending') as 'pending' | 'in_progress' | 'completed',
+              price: Number(job.price) || 0,
+              created_at: job.created_at
+            };
+          }),
         },
         weeklyIncome,
         jobStatus,
+        monthlyIncomeSeries,
+        serviceDistribution,
+        financial: {
+          inventoryInvestment,
+          monthlyAnalysis,
+        },
+        reminders: {
+          upcomingJobs,
+          lowStock,
+        },
       };
 
       return dashboardData;
@@ -234,12 +404,12 @@ export default function Dashboard() {
   };
   
   // Use React Query for data fetching
-  const { 
-    data: dashboardData, 
-    isLoading, 
-    isError, 
+  const {
+    data: dashboardData,
+    isLoading,
+    isError,
     error,
-    refetch 
+    refetch
   } = useQuery({
     queryKey: ['dashboard-data', dateRange],
     queryFn: () => fetchDashboardData(dateRange),
@@ -281,67 +451,16 @@ export default function Dashboard() {
     jobs: { total: 0, pending: 0, inProgress: 0, completed: 0, completionRate: 0, recent: [] },
     weeklyIncome: [],
     jobStatus: [],
+    monthlyIncomeSeries: [],
+    serviceDistribution: [],
+    reminders: {
+      upcomingJobs: [],
+      lowStock: [],
+    },
   };
   
   const data = dashboardData || defaultData;
   
-  // Smart Alerts Logic
-  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
-  
-  const getSmartAlerts = () => {
-    const alerts: Array<{ id: string; type: 'warning' | 'info' | 'success'; title: string; message: string; action?: () => void; actionLabel?: string }> = [];
-    
-    // Alert: Too many pending jobs
-    if (data.jobs.pending >= 3 && !dismissedAlerts.includes('pending-jobs')) {
-      alerts.push({
-        id: 'pending-jobs',
-        type: 'warning',
-        title: 'Pending Jobs Need Attention',
-        message: `You have ${data.jobs.pending} jobs waiting to start. Review and begin working on them.`,
-        action: () => navigateToJobs({ status: 'pending', when: 'all' }),
-        actionLabel: 'View Pending Jobs'
-      });
-    }
-    
-    // Alert: Great performance
-    if (data.income.monthlyGrowth > 20 && !dismissedAlerts.includes('great-growth')) {
-      alerts.push({
-        id: 'great-growth',
-        type: 'success',
-        title: 'Excellent Growth! 🎉',
-        message: `You're ${data.income.monthlyGrowth}% ahead of last month. Keep up the great work!`,
-      });
-    }
-    
-    // Alert: Behind last month
-    if (data.income.monthlyGrowth < -10 && !dismissedAlerts.includes('behind-growth')) {
-      alerts.push({
-        id: 'behind-growth',
-        type: 'warning',
-        title: 'Income Below Last Month',
-        message: `Revenue is ${Math.abs(data.income.monthlyGrowth)}% lower than last month. Consider following up with customers.`,
-        action: () => navigateToJobs({ status: 'pending', when: 'all' }),
-        actionLabel: 'Start Pending Jobs'
-      });
-    }
-    
-    // Alert: No income today (after 2pm)
-    const currentHour = new Date().getHours();
-    if (data.income.today === 0 && currentHour >= 14 && !dismissedAlerts.includes('no-income-today')) {
-      alerts.push({
-        id: 'no-income-today',
-        type: 'info',
-        title: 'No Completed Jobs Today',
-        message: 'You haven\'t completed any paid jobs today yet. Check your in-progress jobs.',
-        action: () => navigateToJobs({ status: 'in_progress', when: 'all' }),
-        actionLabel: 'View Active Jobs'
-      });
-    }
-    
-    return alerts;
-  };
-  
-  const smartAlerts = getSmartAlerts();
   
   // Export dashboard data as CSV
   const exportToCSV = () => {
@@ -385,7 +504,7 @@ export default function Dashboard() {
           job.customer_name,
           job.service_type,
           job.status,
-          `$${job.total_amount.toFixed(2)}`,
+          `$${job.price.toFixed(2)}`,
           format(new Date(job.created_at), 'MMM d, yyyy')
         ])
       ].map(row => row.join(',')).join('\n');
@@ -452,63 +571,23 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      {/* Smart Alert Banner */}
-      {smartAlerts.length > 0 && (
-        <div className="space-y-2">
-          {smartAlerts.map((alert) => (
-            <Alert
-              key={alert.id}
-              variant={alert.type === 'warning' ? 'destructive' : 'default'}
-              className={`relative ${
-                alert.type === 'success' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
-                alert.type === 'info' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' :
-                'border-amber-500 bg-amber-50 dark:bg-amber-950'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                {alert.type === 'success' ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500 mt-0.5" />
-                ) : alert.type === 'warning' ? (
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5" />
-                ) : (
-                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-500 mt-0.5" />
-                )}
-                <div className="flex-1">
-                  <AlertTitle className="text-sm font-semibold mb-1">{alert.title}</AlertTitle>
-                  <AlertDescription className="text-sm">
-                    {alert.message}
-                  </AlertDescription>
-                  {alert.action && alert.actionLabel && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={alert.action}
-                      className="mt-2"
-                    >
-                      {alert.actionLabel}
-                    </Button>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDismissedAlerts([...dismissedAlerts, alert.id])}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </Alert>
-          ))}
-        </div>
-      )}
       
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Overview of your business performance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Input
+            placeholder="Quick search jobs (press Enter)"
+            className="w-[220px] hidden md:block"
+            onKeyDown={(e) => {
+              const target = e.target as HTMLInputElement;
+              if (e.key === 'Enter' && target.value.trim()) {
+                navigate(`/jobs?q=${encodeURIComponent(target.value.trim())}`);
+              }
+            }}
+          />
           <Select value={dateRange} onValueChange={(value: DateRange) => setDateRange(value)}>
             <SelectTrigger className="w-[140px]">
               <Calendar className="h-4 w-4 mr-2" />
@@ -541,67 +620,25 @@ export default function Dashboard() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => navigate('/jobs/new')} className="gap-2 h-9">
-            <Plus className="h-4 w-4" />
-            <span className="hidden xs:inline">New Job</span>
-          </Button>
         </div>
       </div>
 
-      {/* Job Status Overview */}
+      {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 px-1">Job Status</h2>
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-          <Card 
-            role="button" 
-            onClick={() => navigateToJobs({ status: 'pending', when: dateRange })} 
-            className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-amber-200 dark:border-amber-900"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Jobs</CardTitle>
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600 dark:text-amber-500">{data.jobs.pending}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Waiting to start
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            role="button" 
-            onClick={() => navigateToJobs({ status: 'in_progress', when: dateRange })} 
-            className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-blue-200 dark:border-blue-900"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <Clock className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-500">{data.jobs.inProgress}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Currently working on
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            role="button" 
-            onClick={() => navigateToJobs({ status: 'completed', when: dateRange })} 
-            className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.02] border-green-200 dark:border-green-900"
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed Jobs</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600 dark:text-green-500">{data.jobs.completed}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Finished & paid
-              </p>
-            </CardContent>
-          </Card>
+        <h2 className="text-lg font-semibold mb-3 px-1">Quick Actions</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/jobs/new')} className="gap-2 h-9">
+            <Plus className="h-4 w-4" />
+            Create Job
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/inventory')} className="gap-2 h-9">
+            <Package className="h-4 w-4" />
+            Add Inventory
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/customers')} className="gap-2 h-9">
+            <Users className="h-4 w-4" />
+            View Customers
+          </Button>
         </div>
       </div>
 
@@ -706,13 +743,9 @@ export default function Dashboard() {
               <div className="h-[200px] sm:h-[250px] flex flex-col items-center justify-center text-center p-4 sm:p-6">
                 <DollarSign className="h-12 w-12 text-muted-foreground/50 mb-3" />
                 <h3 className="font-semibold text-lg mb-2">No Income Data</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Start adding jobs to see your weekly income trends
                 </p>
-                <Button onClick={() => navigate('/jobs/new')} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Job
-                </Button>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
@@ -755,184 +788,267 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Job Status */}
+        {/* Monthly Income (Last 6 Months) */}
         <Card>
           <CardHeader>
-            <CardTitle>Job Status</CardTitle>
-            <CardDescription>Current job distribution</CardDescription>
+            <CardTitle>Monthly Income</CardTitle>
+            <CardDescription>Last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            {data.jobStatus.length === 0 ? (
-              <div className="h-[200px] sm:h-[250px] flex flex-col items-center justify-center text-center p-4 sm:p-6">
-                <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-3" />
-                <h3 className="font-semibold text-lg mb-2">No Jobs Yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create your first job to start tracking your business
-                </p>
-                <Button onClick={() => navigate('/jobs/new')} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Job
-                </Button>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                <Pie
-                  data={data.jobStatus}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ status, count, percent }) => {
-                    if (count === 0) return null;
-                    return `${status}: ${count} (${(percent * 100).toFixed(0)}%)`;
-                  }}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                  onClick={(_, index) => {
-                    const item = data.jobStatus[index];
-                    if (!item) return;
-                    const statusMap: Record<string, string> = {
-                      'Completed': 'completed',
-                      'In Progress': 'in_progress',
-                      'Pending': 'pending'
-                    };
-                    navigateToJobs({ status: statusMap[item.status] || 'completed', when: dateRange });
-                  }}
-                >
-                  {data.jobStatus.map((entry, index) => {
-                    const colors = {
-                      'Completed': '#22c55e',
-                      'In Progress': '#3b82f6',
-                      'Pending': '#f59e0b'
-                    };
-                    return (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={colors[entry.status as keyof typeof colors] || '#8884d8'}
-                        className="hover:opacity-80 transition-opacity cursor-pointer"
-                      />
-                    );
-                  })}
-                </Pie>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.monthlyIncomeSeries}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" className="text-xs" tick={{ fill: 'currentColor' }} />
+                <YAxis className="text-xs" tick={{ fill: 'currentColor' }} tickFormatter={(v) => `$${v}`} />
                 <Tooltip 
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const data = payload[0].payload;
                       return (
                         <div className="bg-popover border rounded-lg shadow-lg p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            {data.status === 'Completed' ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : data.status === 'In Progress' ? (
-                              <Clock className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-amber-500" />
-                            )}
-                            <p className="text-sm font-medium">{data.status}</p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {data.count} {data.count === 1 ? 'job' : 'jobs'}
-                          </p>
+                          <p className="text-sm font-medium">{payload[0].payload.month}</p>
+                          <p className="text-sm text-primary font-bold">{formatCurrency(payload[0].payload.amount)}</p>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  iconType="circle"
-                />
-                </PieChart>
+                <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[8,8,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Service Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Distribution</CardTitle>
+            <CardDescription>Jobs by service type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.serviceDistribution.length === 0 ? (
+              <div className="h-[250px] flex flex-col items-center justify-center text-center p-6">
+                <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <h3 className="font-semibold text-lg mb-2">No Service Data</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create jobs to see service type distribution
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={data.serviceDistribution} layout="vertical" margin={{ left: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" className="text-xs" tick={{ fill: 'currentColor' }} />
+                  <YAxis type="category" dataKey="type" className="text-xs" tick={{ fill: 'currentColor' }} width={120} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-popover border rounded-lg shadow-lg p-3">
+                            <p className="text-sm font-medium">{payload[0].payload.type}</p>
+                            <p className="text-sm text-primary font-bold">{payload[0].payload.count} jobs</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" fill="hsl(var(--accent))" radius={[8,8,8,8]} />
+                </BarChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent Jobs */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Recent Jobs</CardTitle>
-              <CardDescription>Latest job activities</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/jobs')}>
-              View All
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {data.jobs.recent.length > 0 ? (
-              data.jobs.recent.map((job) => (
-                <div 
-                  key={job.id} 
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  onClick={() => navigate(`/jobs/${job.id}`)}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-full ${
-                      job.status === 'completed' 
-                        ? 'bg-green-100 text-green-600 dark:bg-green-900/50' 
-                        : job.status === 'in_progress'
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50'
-                        : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50'
-                    }`}>
-                      {job.status === 'completed' ? (
-                        <CheckCircle className="h-5 w-5" />
-                      ) : job.status === 'in_progress' ? (
-                        <Clock className="h-5 w-5" />
-                      ) : (
-                        <AlertCircle className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{job.service_type}</p>
-                      <p className="text-sm text-muted-foreground">{job.customer_name}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{formatCurrency(job.total_amount)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(job.created_at), 'MMM d, yyyy')}
-                    </p>
-                  </div>
+        {/* Financial Analytics Section */}
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle>Financial Analytics</CardTitle>
+            <CardDescription>Inventory investment and monthly profit analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Inventory Investment KPI */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Total Inventory Investment</p>
+                  <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                    {formatCurrency(data.financial.inventoryInvestment)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sum of all unit costs × quantities in stock
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <FileText className="h-16 w-16 text-muted-foreground/50 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">No Jobs Found</h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-                  {dateRange === 'today' 
-                    ? 'No jobs created today. Start by creating a new job.'
-                    : dateRange === 'week'
-                    ? 'No jobs this week. Create a job to get started.'
-                    : dateRange === 'month'
-                    ? 'No jobs this month. Time to create your first job!'
-                    : dateRange === 'lastMonth'
-                    ? 'No jobs last month. Check a different time period or create a new job.'
-                    : 'Get started by creating your first job and tracking your business.'}
-                </p>
-                <div className="flex gap-2">
-                  <Button onClick={() => navigate('/jobs/new')} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Job
-                  </Button>
-                  <Button onClick={() => navigate('/customers')} variant="outline" size="sm">
-                    <Users className="h-4 w-4 mr-2" />
-                    Add Customer
-                  </Button>
-                </div>
+                <Package className="h-12 w-12 text-emerald-600 dark:text-emerald-400 opacity-50" />
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+
+            {/* Monthly Profit Analysis Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-semibold text-sm">Month</th>
+                    <th className="text-right py-3 px-4 font-semibold text-sm">Jobs</th>
+                    <th className="text-right py-3 px-4 font-semibold text-sm">Material Cost</th>
+                    <th className="text-right py-3 px-4 font-semibold text-sm">Revenue</th>
+                    <th className="text-right py-3 px-4 font-semibold text-sm">Profit</th>
+                    <th className="text-right py-3 px-4 font-semibold text-sm">Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.financial.monthlyAnalysis.map((month, idx) => (
+                    <tr key={idx} className="border-b hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-4 font-medium">{month.month}</td>
+                      <td className="text-right py-3 px-4 text-muted-foreground">{month.jobCount}</td>
+                      <td className="text-right py-3 px-4 text-orange-600 dark:text-orange-400">
+                        {formatCurrency(month.materialCost)}
+                      </td>
+                      <td className="text-right py-3 px-4 text-blue-600 dark:text-blue-400 font-medium">
+                        {formatCurrency(month.revenue)}
+                      </td>
+                      <td className="text-right py-3 px-4 font-semibold">
+                        <span className={month.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                          {formatCurrency(month.profit)}
+                        </span>
+                      </td>
+                      <td className="text-right py-3 px-4">
+                        <span className={`font-medium ${
+                          month.profitMargin >= 50 ? 'text-green-600 dark:text-green-400' :
+                          month.profitMargin >= 25 ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>
+                          {month.profitMargin.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr className="bg-muted/50 font-semibold">
+                    <td className="py-3 px-4">Total</td>
+                    <td className="text-right py-3 px-4">
+                      {data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.jobCount, 0)}
+                    </td>
+                    <td className="text-right py-3 px-4 text-orange-600 dark:text-orange-400">
+                      {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.materialCost, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4 text-blue-600 dark:text-blue-400">
+                      {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.revenue, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4 text-green-600 dark:text-green-400">
+                      {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.profit, 0))}
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      {(() => {
+                        const totalRevenue = data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.revenue, 0);
+                        const totalProfit = data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.profit, 0);
+                        const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+                        return `${avgMargin.toFixed(1)}%`;
+                      })()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Summary Insights */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+                <p className="text-xs text-muted-foreground mb-1">Total Materials Used</p>
+                <p className="text-xl font-bold text-orange-700 dark:text-orange-400">
+                  {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.materialCost, 0))}
+                </p>
+              </div>
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-muted-foreground mb-1">Total Revenue (6 months)</p>
+                <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
+                  {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.revenue, 0))}
+                </p>
+              </div>
+              <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-xs text-muted-foreground mb-1">Total Profit (6 months)</p>
+                <p className="text-xl font-bold text-green-700 dark:text-green-400">
+                  {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.profit, 0))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Latest jobs and actions</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/jobs')}>
+                View All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {data.jobs.recent.length > 0 ? (
+                data.jobs.recent.map((job) => (
+                  <div 
+                    key={job.id} 
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className={`p-2 rounded-full ${
+                        job.status === 'completed' 
+                          ? 'bg-green-100 text-green-600 dark:bg-green-900/50' 
+                          : job.status === 'in_progress'
+                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50'
+                          : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50'
+                      }`}>
+                        {job.status === 'completed' ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : job.status === 'in_progress' ? (
+                          <Clock className="h-5 w-5" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{job.service_type}</p>
+                        <p className="text-sm text-muted-foreground">{job.customer_name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{formatCurrency(job.price)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(job.created_at), 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="h-16 w-16 text-muted-foreground/50 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">No Recent Activity</h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                    Get started by creating a job, adding inventory, or adding a customer.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button onClick={() => navigate('/jobs/new')} size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Job
+                    </Button>
+                    <Button onClick={() => navigate('/customers')} variant="outline" size="sm">
+                      <Users className="h-4 w-4 mr-2" />
+                      Add Customer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

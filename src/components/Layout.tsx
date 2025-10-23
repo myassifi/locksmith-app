@@ -32,10 +32,10 @@ export function Layout({ children }: LayoutProps) {
                 <Menu className="h-5 w-5" />
               </SidebarTrigger>
               
-              <div className="flex items-center gap-2 min-w-0">
-                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-accent flex-shrink-0" />
+              <div className="flex items-center gap-2 min-w-0 lg:hidden">
+                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-white flex-shrink-0" />
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-primary truncate">
+                  <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                     <span className="hidden sm:inline">Heat Wave Locksmith</span>
                     <span className="sm:hidden">Heat Wave</span>
                   </h1>

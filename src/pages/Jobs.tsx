@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ReceiptDialog } from '@/components/ReceiptDialog';
-import { Plus, Search, Edit, Trash2, Calendar, DollarSign, Phone, MapPin, Navigation, Package, TrendingUp, Target, Briefcase, Clock, CheckCircle, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Calendar, DollarSign, Phone, MapPin, Navigation, Package, TrendingUp, Target, Briefcase, Clock, CheckCircle, AlertCircle, ArrowUpDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -393,6 +393,13 @@ export default function Jobs() {
   const handleCallCustomer = (phone: string) => {
     if (phone) {
       window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+    }
+  };
+
+  const handleSMSCustomer = (phone: string, customerName: string, jobType: string) => {
+    if (phone) {
+      const message = `Hi ${customerName}, this is regarding your ${jobType} service. `;
+      window.location.href = `sms:${phone.replace(/\s+/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(message)}`;
     }
   };
 
@@ -850,14 +857,26 @@ export default function Jobs() {
                     <CardTitle className="text-lg flex items-center gap-2">
                       {job.customers?.name}
                       {job.customers?.phone && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCallCustomer(job.customers.phone!)}
-                          className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
-                        >
-                          <Phone className="h-3 w-3" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSMSCustomer(job.customers.phone!, job.customers.name, formatJobType(job.job_type))}
+                            className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                            title="Send SMS"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCallCustomer(job.customers.phone!)}
+                            className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                            title="Call"
+                          >
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                        </>
                       )}
                       {job.customers?.address && (
                         <Button

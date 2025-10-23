@@ -51,11 +51,24 @@ export default function InventoryNew() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'low' | 'out' | 'in-stock' | 'reorder'>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'quantity-high' | 'quantity-low' | 'cost-high' | 'cost-low' | 'low-stock'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'quantity-high' | 'quantity-low' | 'cost-high' | 'cost-low' | 'low-stock' | 'recently-added'>('name');
   const [showLowStockAlert, setShowLowStockAlert] = useState(true);
+  const [duplicateItem, setDuplicateItem] = useState<InventoryItem | null>(null);
+  const [duplicateField, setDuplicateField] = useState<'sku' | 'fcc_id' | null>(null);
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState({
+    quantity: '',
+    supplier: '',
+    low_stock_threshold: '',
+    action: 'add' as 'add' | 'set' | 'subtract'
+  });
+  const [searchSuggestions, setSearchSuggestions] = useState<InventoryItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -201,6 +214,10 @@ export default function InventoryNew() {
         if (activeTab === 'low') return item.quantity <= threshold && item.quantity > 0;
         if (activeTab === 'out') return item.quantity === 0;
         if (activeTab === 'in-stock') return item.quantity > threshold;
+        if (activeTab === 'reorder') {
+          // Smart reorder logic: items at or below threshold OR out of stock
+          return item.quantity <= threshold;
+        }
         return true;
       });
     }
@@ -257,6 +274,13 @@ export default function InventoryNew() {
           return aRatio - bRatio;
         });
         break;
+      case 'recently-added':
+        filtered.sort((a, b) => {
+          const aDate = new Date(a.created_at || 0).getTime();
+          const bDate = new Date(b.created_at || 0).getTime();
+          return bDate - aDate; // Most recent first
+        });
+        break;
     }
 
     return filtered;
@@ -264,11 +288,16 @@ export default function InventoryNew() {
 
   // Stats
   const stats = useMemo(() => {
+    const lowStockItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3) && i.quantity > 0);
+    const outOfStockItems = inventory.filter(i => i.quantity === 0);
+    const reorderItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3));
+    
     return {
       all: inventory.length,
-      low: inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3) && i.quantity > 0).length,
-      out: inventory.filter(i => i.quantity === 0).length,
+      low: lowStockItems.length,
+      out: outOfStockItems.length,
       inStock: inventory.filter(i => i.quantity > (i.low_stock_threshold || 3)).length,
+      reorder: reorderItems.length,
     };
   }, [inventory]);
 
@@ -371,6 +400,16 @@ export default function InventoryNew() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Final duplicate check before submission
+    if (!editingItem && duplicateItem) {
+      toast({
+        title: "Duplicate Detected",
+        description: `An item with this ${duplicateField === 'sku' ? 'SKU' : 'FCC ID'} already exists. Please update the existing item instead.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const itemData = {
         item_name: formData.item_name || null,
@@ -420,6 +459,8 @@ export default function InventoryNew() {
 
   const resetForm = () => {
     setEditingItem(null);
+    setDuplicateItem(null);
+    setDuplicateField(null);
     setFormData({
       item_name: '',
       sku: '',
@@ -437,6 +478,43 @@ export default function InventoryNew() {
     });
   };
 
+  // Check for duplicate SKU or FCC ID in real-time
+  const checkForDuplicate = (field: 'sku' | 'fcc_id', value: string) => {
+    if (!value.trim()) {
+      setDuplicateItem(null);
+      setDuplicateField(null);
+      return;
+    }
+
+    const duplicate = inventory.find(item => {
+      // Skip the item being edited
+      if (editingItem && item.id === editingItem.id) return false;
+      
+      if (field === 'sku') {
+        return item.sku.toLowerCase() === value.toLowerCase();
+      } else {
+        return item.fcc_id?.toLowerCase() === value.toLowerCase();
+      }
+    });
+
+    if (duplicate) {
+      setDuplicateItem(duplicate);
+      setDuplicateField(field);
+    } else {
+      setDuplicateItem(null);
+      setDuplicateField(null);
+    }
+  };
+
+  // Handle updating existing item instead of creating duplicate
+  const handleUpdateExisting = () => {
+    if (duplicateItem) {
+      handleEdit(duplicateItem);
+      setDuplicateItem(null);
+      setDuplicateField(null);
+    }
+  };
+
   const clearFilters = () => {
     setFilters({
       category: 'all',
@@ -446,6 +524,108 @@ export default function InventoryNew() {
       stockStatus: 'all',
       fccId: '',
     });
+  };
+
+  // Bulk edit functions
+  const toggleItemSelection = (id: string) => {
+    setSelectedItems(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.length === filteredInventory.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredInventory.map(item => item.id));
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      const updates = selectedItems.map(async (id) => {
+        const item = inventory.find(i => i.id === id);
+        if (!item) return;
+
+        const updateData: any = {};
+
+        // Handle quantity update
+        if (bulkEditData.quantity) {
+          const qty = parseInt(bulkEditData.quantity);
+          if (bulkEditData.action === 'add') {
+            updateData.quantity = item.quantity + qty;
+          } else if (bulkEditData.action === 'subtract') {
+            updateData.quantity = Math.max(0, item.quantity - qty);
+          } else {
+            updateData.quantity = qty;
+          }
+        }
+
+        // Handle supplier update
+        if (bulkEditData.supplier) {
+          updateData.supplier = bulkEditData.supplier;
+        }
+
+        // Handle threshold update
+        if (bulkEditData.low_stock_threshold) {
+          updateData.low_stock_threshold = parseInt(bulkEditData.low_stock_threshold);
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase
+            .from('inventory')
+            .update(updateData)
+            .eq('id', id);
+          
+          if (error) throw error;
+        }
+      });
+
+      await Promise.all(updates);
+      
+      toast({
+        title: "Success",
+        description: `Updated ${selectedItems.length} items`,
+      });
+
+      setBulkEditDialogOpen(false);
+      setSelectedItems([]);
+      setBulkEditMode(false);
+      setBulkEditData({ quantity: '', supplier: '', low_stock_threshold: '', action: 'add' });
+      await loadInventory();
+    } catch (error) {
+      console.error('Bulk update error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update items",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Search suggestions with fuzzy matching
+  const updateSearchSuggestions = (query: string) => {
+    if (!query.trim()) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const search = query.toLowerCase();
+    const matches = inventory
+      .filter(item => 
+        item.item_name?.toLowerCase().includes(search) ||
+        item.sku?.toLowerCase().includes(search) ||
+        item.fcc_id?.toLowerCase().includes(search) ||
+        item.make?.toLowerCase().includes(search) ||
+        item.supplier?.toLowerCase().includes(search)
+      )
+      .slice(0, 5); // Limit to 5 suggestions
+
+    setSearchSuggestions(matches);
+    setShowSuggestions(matches.length > 0);
   };
 
   const handleRefresh = async () => {
@@ -506,37 +686,79 @@ export default function InventoryNew() {
       subtitle="Smart Inventory Management"
       actions={
         <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportToCSV}
-            className="gap-2 touch-target"
-            disabled={inventory.length === 0}
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            className="touch-target"
-            aria-label="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <InventoryFilters
-            filters={filters}
-            onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
-            onReset={clearFilters}
-            suppliers={uniqueSuppliers}
-            makes={uniqueMakes}
-            categories={uniqueCategories}
-          />
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2 touch-target">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Item</span>
-          </Button>
+          {bulkEditMode && selectedItems.length > 0 ? (
+            <>
+              <Badge variant="secondary" className="gap-1">
+                {selectedItems.length} selected
+              </Badge>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setBulkEditDialogOpen(true)}
+                className="gap-2 touch-target"
+              >
+                <Package className="h-4 w-4" />
+                Bulk Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedItems([]);
+                  setBulkEditMode(false);
+                }}
+                className="touch-target"
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant={bulkEditMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setBulkEditMode(!bulkEditMode);
+                  setSelectedItems([]);
+                }}
+                className="gap-2 touch-target"
+              >
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Bulk Edit</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToCSV}
+                className="gap-2 touch-target"
+                disabled={inventory.length === 0}
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                className="touch-target"
+                aria-label="Refresh"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <InventoryFilters
+                filters={filters}
+                onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
+                onReset={clearFilters}
+                suppliers={uniqueSuppliers}
+                makes={uniqueMakes}
+                categories={uniqueCategories}
+              />
+              <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2 touch-target">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add Item</span>
+              </Button>
+            </>
+          )}
         </>
       }
       tabs={
@@ -610,8 +832,56 @@ export default function InventoryNew() {
             </Card>
           </div>
 
+          {/* Reorder Suggestions Banner */}
+          {activeTab === 'reorder' && filteredInventory.length > 0 && (
+            <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+              <ShoppingCart className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center justify-between flex-1">
+                <div>
+                  <AlertTitle className="text-blue-900 dark:text-blue-100">Reorder Suggestions</AlertTitle>
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    {filteredInventory.length} item{filteredInventory.length > 1 ? 's' : ''} need{filteredInventory.length === 1 ? 's' : ''} reordering based on stock thresholds.
+                    {inventoryStats.outOfStock > 0 && ` ${inventoryStats.outOfStock} completely out of stock.`}
+                  </AlertDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Export reorder list
+                      const reorderList = filteredInventory.map(item => ({
+                        sku: item.sku,
+                        name: item.item_name || item.sku,
+                        current: item.quantity,
+                        threshold: item.low_stock_threshold || 3,
+                        supplier: item.supplier || 'N/A',
+                        cost: item.cost || 0
+                      }));
+                      const csv = [
+                        ['SKU', 'Item Name', 'Current Qty', 'Threshold', 'Supplier', 'Unit Cost'],
+                        ...reorderList.map(i => [i.sku, i.name, i.current, i.threshold, i.supplier, i.cost])
+                      ].map(row => row.join(',')).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `reorder-list-${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      toast({ title: 'Success', description: 'Reorder list exported' });
+                    }}
+                    className="bg-white dark:bg-gray-800"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Export List
+                  </Button>
+                </div>
+              </div>
+            </Alert>
+          )}
+
           {/* Low Stock Alert Banner */}
-          {inventoryStats.lowStock > 0 && showLowStockAlert && (
+          {activeTab !== 'reorder' && inventoryStats.lowStock > 0 && showLowStockAlert && (
             <Alert variant="default" className="border-amber-500 bg-amber-50 dark:bg-amber-950">
               <AlertTriangle className="h-5 w-5 text-amber-600" />
               <div className="flex items-center justify-between flex-1">
@@ -647,13 +917,55 @@ export default function InventoryNew() {
           {/* Search Bar & Sort */}
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
-                placeholder="Search by name, FCC ID, supplier..."
+                placeholder="Search by name, SKU, FCC ID, supplier..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchTerm(value);
+                  updateSearchSuggestions(value);
+                }}
+                onFocus={() => {
+                  if (searchTerm) updateSearchSuggestions(searchTerm);
+                }}
+                onBlur={() => {
+                  // Delay to allow click on suggestion
+                  setTimeout(() => setShowSuggestions(false), 200);
+                }}
                 className="pl-10 h-9 touch-target"
               />
+              
+              {/* Search Suggestions Dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                  {searchSuggestions.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors"
+                      onClick={() => {
+                        setSearchTerm(item.item_name || item.sku);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{item.item_name || 'Unnamed Item'}</p>
+                          <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                          {item.fcc_id && (
+                            <p className="text-xs text-muted-foreground">FCC: {item.fcc_id}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={item.quantity <= (item.low_stock_threshold || 3) ? 'destructive' : 'secondary'}>
+                            Qty: {item.quantity}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
@@ -663,6 +975,7 @@ export default function InventoryNew() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name">Name A-Z</SelectItem>
+                <SelectItem value="recently-added">Recently Added</SelectItem>
                 <SelectItem value="quantity-high">Qty: High-Low</SelectItem>
                 <SelectItem value="quantity-low">Qty: Low-High</SelectItem>
                 <SelectItem value="cost-high">Cost: High-Low</SelectItem>
@@ -707,9 +1020,13 @@ export default function InventoryNew() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full justify-start overflow-x-auto grid grid-cols-4">
+            <TabsList className="w-full justify-start overflow-x-auto grid grid-cols-5">
               <TabsTrigger value="all" className="gap-2 touch-target">
                 All <Badge variant="secondary" className="ml-1">{stats.all}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="reorder" className="gap-2 touch-target">
+                <ShoppingCart className="h-3 w-3" />
+                Reorder <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-400">{stats.reorder}</Badge>
               </TabsTrigger>
               <TabsTrigger value="low" className="gap-2 touch-target">
                 Low <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">{stats.low}</Badge>
@@ -757,6 +1074,22 @@ export default function InventoryNew() {
         </div>
       ) : (
         <>
+          {/* Bulk Edit Mode: Select All */}
+          {bulkEditMode && filteredInventory.length > 0 && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selectedItems.length === filteredInventory.length}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <span className="text-sm font-medium">
+                {selectedItems.length === filteredInventory.length ? 'Deselect All' : 'Select All'}
+                {selectedItems.length > 0 && ` (${selectedItems.length} selected)`}
+              </span>
+            </div>
+          )}
+
           {/* Desktop Table View */}
           <div className="hidden lg:block">
             <InventoryDataTable
@@ -788,6 +1121,34 @@ export default function InventoryNew() {
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
           </DialogHeader>
+          
+          {/* Duplicate Warning Banner */}
+          {!editingItem && duplicateItem && (
+            <Alert variant="destructive" className="animate-in slide-in-from-top">
+              <AlertTriangle className="h-5 w-5" />
+              <div className="flex-1">
+                <AlertTitle>Duplicate {duplicateField === 'sku' ? 'SKU' : 'FCC ID'} Detected!</AlertTitle>
+                <AlertDescription>
+                  An item with this {duplicateField === 'sku' ? 'SKU' : 'FCC ID'} already exists:
+                  <div className="mt-2 p-2 bg-background rounded border">
+                    <p className="font-medium">{duplicateItem.item_name || 'Unnamed Item'}</p>
+                    <p className="text-sm text-muted-foreground">SKU: {duplicateItem.sku}</p>
+                    <p className="text-sm text-muted-foreground">Quantity: {duplicateItem.quantity}</p>
+                  </div>
+                </AlertDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleUpdateExisting}
+                className="ml-2"
+              >
+                Update Existing
+              </Button>
+            </Alert>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               {/* Left Column */}
@@ -806,10 +1167,21 @@ export default function InventoryNew() {
                   <Label>SKU *</Label>
                   <Input
                     value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, sku: value });
+                      checkForDuplicate('sku', value);
+                    }}
                     required
                     placeholder="e.g., XNFO01EN"
+                    className={duplicateField === 'sku' ? 'border-destructive' : ''}
                   />
+                  {duplicateField === 'sku' && duplicateItem && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      SKU already exists: {duplicateItem.item_name || duplicateItem.sku}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -918,9 +1290,22 @@ export default function InventoryNew() {
                   <Label>FCC ID</Label>
                   <Input
                     value={formData.fcc_id}
-                    onChange={(e) => setFormData({ ...formData, fcc_id: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, fcc_id: value });
+                      if (value.trim()) {
+                        checkForDuplicate('fcc_id', value);
+                      }
+                    }}
                     placeholder="e.g., 2AATX-XKHY01EN"
+                    className={duplicateField === 'fcc_id' ? 'border-destructive' : ''}
                   />
+                  {duplicateField === 'fcc_id' && duplicateItem && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      FCC ID already exists: {duplicateItem.item_name || duplicateItem.sku}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -950,6 +1335,111 @@ export default function InventoryNew() {
           </form>
         </DialogContent>
       </Dialog>
+      {/* Bulk Edit Dialog */}
+      <Dialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Edit {selectedItems.length} Items</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                Changes will be applied to all {selectedItems.length} selected items.
+              </AlertDescription>
+            </Alert>
+
+            <div>
+              <Label>Quantity Action</Label>
+              <Select 
+                value={bulkEditData.action} 
+                onValueChange={(value: 'add' | 'set' | 'subtract') => 
+                  setBulkEditData({ ...bulkEditData, action: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="add">Add to current quantity</SelectItem>
+                  <SelectItem value="set">Set to specific quantity</SelectItem>
+                  <SelectItem value="subtract">Subtract from current</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Quantity {bulkEditData.action === 'add' ? '(Add)' : bulkEditData.action === 'subtract' ? '(Subtract)' : '(Set To)'}</Label>
+              <Input
+                type="number"
+                value={bulkEditData.quantity}
+                onChange={(e) => setBulkEditData({ ...bulkEditData, quantity: e.target.value })}
+                placeholder="Leave empty to skip"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <Label>Supplier (Optional)</Label>
+              <Select 
+                value={bulkEditData.supplier} 
+                onValueChange={(value) => setBulkEditData({ ...bulkEditData, supplier: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select to update supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Don't change</SelectItem>
+                  {suppliers.map(supplier => (
+                    <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Low Stock Threshold (Optional)</Label>
+              <Input
+                type="number"
+                value={bulkEditData.low_stock_threshold}
+                onChange={(e) => setBulkEditData({ ...bulkEditData, low_stock_threshold: e.target.value })}
+                placeholder="Leave empty to skip"
+                min="0"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setBulkEditDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleBulkUpdate}
+                className="flex-1"
+                disabled={!bulkEditData.quantity && !bulkEditData.supplier && !bulkEditData.low_stock_threshold}
+              >
+                Update {selectedItems.length} Items
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Floating Action Button for Quick Add */}
+      {!bulkEditMode && (
+        <Button
+          onClick={() => { resetForm(); setDialogOpen(true); }}
+          className="fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-lg lg:hidden bg-primary hover:bg-primary/90 transition-all duration-200 active:scale-95 touch-target"
+          size="icon"
+          aria-label="Quick Add Item"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </PageShell>
   );
 }
