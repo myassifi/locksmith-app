@@ -130,6 +130,16 @@ export default function Jobs() {
     loadCustomers();
   }, []);
 
+  useEffect(() => {
+    const newParam = searchParams.get('new');
+    if (newParam === 'true') {
+      setDialogOpen(true);
+      // Clear the parameter after opening
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
   const loadJobs = async () => {
     try {
       const { data, error } = await supabase

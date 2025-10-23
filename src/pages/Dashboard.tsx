@@ -627,7 +627,7 @@ export default function Dashboard() {
       <div>
         <h2 className="text-lg font-semibold mb-3 px-1">Quick Actions</h2>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate('/jobs/new')} className="gap-2 h-9">
+          <Button onClick={() => navigate('/jobs?new=true')} className="gap-2 h-9">
             <Plus className="h-4 w-4" />
             Create Job
           </Button>
