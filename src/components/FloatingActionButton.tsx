@@ -22,7 +22,7 @@ export function FloatingActionButton() {
         navigate('/inventory?action=add');
         setIsOpen(false);
       },
-      color: 'bg-blue-500 hover:bg-blue-600'
+      color: 'bg-primary hover:bg-primary/90'
     },
     {
       icon: Users,
@@ -40,7 +40,7 @@ export function FloatingActionButton() {
         navigate('/jobs?action=add');
         setIsOpen(false);
       },
-      color: 'bg-purple-500 hover:bg-purple-600'
+      color: 'bg-accent hover:bg-accent/90'
     }
   ];
 

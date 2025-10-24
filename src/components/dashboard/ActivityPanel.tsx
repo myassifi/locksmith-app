@@ -30,9 +30,9 @@ export function ActivityPanel({ alerts, onViewAll }: ActivityPanelProps) {
       case 'low-stock':
         return <AlertTriangle className="h-4 w-4 text-amber-600" />;
       case 'job':
-        return <Briefcase className="h-4 w-4 text-blue-600" />;
+        return <Briefcase className="h-4 w-4 text-primary" />;
       case 'customer':
-        return <Users className="h-4 w-4 text-emerald-600" />;
+        return <Users className="h-4 w-4 text-success" />;
     }
   };
 

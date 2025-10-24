@@ -280,7 +280,7 @@ export default function Actions() {
         return <Plus className="h-4 w-4 text-green-600" />;
       case 'update':
       case 'edit':
-        return <Edit className="h-4 w-4 text-blue-600" />;
+        return <Edit className="h-4 w-4 text-primary" />;
       case 'delete':
         return <Trash2 className="h-4 w-4 text-red-600" />;
       case 'view':
@@ -309,7 +309,7 @@ export default function Actions() {
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       case 'update':
       case 'edit':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+        return 'bg-primary/10 text-primary dark:bg-primary/20';
       case 'delete':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
       default:
@@ -384,12 +384,12 @@ export default function Actions() {
         <Card className="hover-lift glass-card">
           <CardHeader className="responsive-card pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <Calendar className="h-4 w-4 text-primary" />
               Today's Activities
             </CardTitle>
           </CardHeader>
           <CardContent className="responsive-card pt-0">
-            <div className="text-2xl font-bold text-blue-600">{stats.todayActivities}</div>
+            <div className="text-2xl font-bold text-primary">{stats.todayActivities}</div>
             <p className="text-xs text-muted-foreground">Since midnight</p>
           </CardContent>
         </Card>
@@ -410,12 +410,12 @@ export default function Actions() {
         <Card className="hover-lift glass-card">
           <CardHeader className="responsive-card pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-purple-600" />
+              <Briefcase className="h-4 w-4 text-accent" />
               Jobs Created
             </CardTitle>
           </CardHeader>
           <CardContent className="responsive-card pt-0">
-            <div className="text-2xl font-bold text-purple-600">{stats.jobsCreated}</div>
+            <div className="text-2xl font-bold text-accent">{stats.jobsCreated}</div>
             <p className="text-xs text-muted-foreground">Total jobs</p>
           </CardContent>
         </Card>
@@ -423,12 +423,12 @@ export default function Actions() {
         <Card className="hover-lift glass-card">
           <CardHeader className="responsive-card pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Package className="h-4 w-4 text-orange-600" />
+              <Package className="h-4 w-4 text-accent" />
               Inventory Updates
             </CardTitle>
           </CardHeader>
           <CardContent className="responsive-card pt-0">
-            <div className="text-2xl font-bold text-orange-600">{stats.inventoryUpdates}</div>
+            <div className="text-2xl font-bold text-accent">{stats.inventoryUpdates}</div>
             <p className="text-xs text-muted-foreground">Stock changes</p>
           </CardContent>
         </Card>
@@ -452,7 +452,7 @@ export default function Actions() {
         </Badge>
         <Badge
           variant={filterAction === 'update' ? 'default' : 'outline'}
-          className="cursor-pointer hover:bg-blue-500 hover:text-white transition-colors px-3 py-1.5 border-blue-500 text-blue-600 touch-target"
+          className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1.5 border-primary text-primary touch-target"
           onClick={() => setFilterAction('update')}
         >
           ✏️ Edit ({actionCounts.edit})

@@ -717,7 +717,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium">Average Job Value</CardTitle>
               <div className="flex items-center gap-1">
                 {data.jobs.completed > 0 && (
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <TrendingUp className="h-4 w-4 text-primary" />
                 )}
               </div>
             </CardHeader>
@@ -901,10 +901,10 @@ export default function Dashboard() {
                     <tr key={idx} className="border-b hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-4 font-medium">{month.month}</td>
                       <td className="text-right py-3 px-4 text-muted-foreground">{month.jobCount}</td>
-                      <td className="text-right py-3 px-4 text-orange-600 dark:text-orange-400">
+                      <td className="text-right py-3 px-4 text-accent">
                         {formatCurrency(month.materialCost)}
                       </td>
-                      <td className="text-right py-3 px-4 text-blue-600 dark:text-blue-400 font-medium">
+                      <td className="text-right py-3 px-4 text-primary font-medium">
                         {formatCurrency(month.revenue)}
                       </td>
                       <td className="text-right py-3 px-4 font-semibold">
@@ -932,7 +932,7 @@ export default function Dashboard() {
                     <td className="text-right py-3 px-4 text-orange-600 dark:text-orange-400">
                       {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.materialCost, 0))}
                     </td>
-                    <td className="text-right py-3 px-4 text-blue-600 dark:text-blue-400">
+                    <td className="text-right py-3 px-4 text-primary">
                       {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.revenue, 0))}
                     </td>
                     <td className="text-right py-3 px-4 text-green-600 dark:text-green-400">
@@ -953,15 +953,15 @@ export default function Dashboard() {
 
             {/* Summary Insights */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="p-4 bg-accent/10 dark:bg-accent/20 rounded-lg border border-accent/20 dark:border-accent/30">
                 <p className="text-xs text-muted-foreground mb-1">Total Materials Used</p>
-                <p className="text-xl font-bold text-orange-700 dark:text-orange-400">
+                <p className="text-xl font-bold text-accent">
                   {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.materialCost, 0))}
                 </p>
               </div>
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-4 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20 dark:border-primary/30">
                 <p className="text-xs text-muted-foreground mb-1">Total Revenue (6 months)</p>
-                <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
+                <p className="text-xl font-bold text-primary">
                   {formatCurrency(data.financial.monthlyAnalysis.reduce((sum, m) => sum + m.revenue, 0))}
                 </p>
               </div>
@@ -1002,7 +1002,7 @@ export default function Dashboard() {
                         job.status === 'completed' 
                           ? 'bg-green-100 text-green-600 dark:bg-green-900/50' 
                           : job.status === 'in_progress'
-                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50'
+                          ? 'bg-primary/10 text-primary dark:bg-primary/20'
                           : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50'
                       }`}>
                         {job.status === 'completed' ? (

@@ -812,7 +812,7 @@ export default function InventoryNew() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Avg Cost</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-600" />
+                <TrendingUp className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">${inventoryStats.avgCost.toFixed(0)}</div>
@@ -823,7 +823,7 @@ export default function InventoryNew() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Unique SKUs</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-purple-600" />
+                <ShoppingCart className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{inventoryStats.uniqueSkus}</div>
@@ -834,12 +834,12 @@ export default function InventoryNew() {
 
           {/* Reorder Suggestions Banner */}
           {activeTab === 'reorder' && filteredInventory.length > 0 && (
-            <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
-              <ShoppingCart className="h-5 w-5 text-blue-600" />
+            <Alert className="border-primary bg-primary/10 dark:bg-primary/20">
+              <ShoppingCart className="h-5 w-5 text-primary" />
               <div className="flex items-center justify-between flex-1">
                 <div>
-                  <AlertTitle className="text-blue-900 dark:text-blue-100">Reorder Suggestions</AlertTitle>
-                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                  <AlertTitle className="text-primary">Reorder Suggestions</AlertTitle>
+                  <AlertDescription className="text-primary/80">
                     {filteredInventory.length} item{filteredInventory.length > 1 ? 's' : ''} need{filteredInventory.length === 1 ? 's' : ''} reordering based on stock thresholds.
                     {inventoryStats.outOfStock > 0 && ` ${inventoryStats.outOfStock} completely out of stock.`}
                   </AlertDescription>

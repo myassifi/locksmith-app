@@ -8,121 +8,121 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Custom Color Scheme - #003049, #669BBC, #FDF0D5 */
-    --background: 41 87% 91%; /* #FDF0D5 - Warm Cream */
-    --foreground: 199 100% 14%; /* #003049 - Deep Navy */
+    /* Palette: #4E7D96 (Primary), #FF844B (Accent), #E3EDF2 (Background), #0A0D25 (Foreground) */
+    --background: 200 36% 92%; /* #E3EDF2 */
+    --foreground: 233 58% 9%;  /* #0A0D25 */
 
-    --card: 41 87% 95%; /* Lighter cream for cards */
-    --card-foreground: 199 100% 14%; /* #003049 - Deep Navy */
+    --card: 200 36% 96%;
+    --card-foreground: 233 58% 9%;
 
-    --popover: 41 87% 95%;
-    --popover-foreground: 199 100% 14%;
+    --popover: 200 36% 96%;
+    --popover-foreground: 233 58% 9%;
 
-    /* Primary Steel Blue - Professional & Trustworthy */
-    --primary: 203 40% 57%; /* #669BBC - Steel Blue */
-    --primary-foreground: 41 87% 91%; /* Cream text on blue */
-    --primary-variant: 203 40% 47%; /* Darker steel blue */
+    /* Primary */
+    --primary: 201 32% 45%; /* #4E7D96 */
+    --primary-foreground: 210 40% 98%; /* near-white on primary */
+    --primary-variant: 201 32% 38%; /* darker variant */
 
-    /* Secondary with Deep Navy */
-    --secondary: 199 100% 20%; /* Lighter navy */
-    --secondary-foreground: 41 87% 91%; /* Cream text */
+    /* Secondary */
+    --secondary: 233 58% 14%;
+    --secondary-foreground: 210 40% 98%;
 
-    /* Muted using cream tones */
-    --muted: 41 60% 85%; /* Muted cream */
-    --muted-foreground: 199 80% 25%; /* Muted navy */
+    /* Muted */
+    --muted: 200 20% 85%;
+    --muted-foreground: 233 20% 35%;
 
-    /* Accent using Deep Navy for emphasis */
-    --accent: 199 100% 14%; /* #003049 - Deep Navy */
-    --accent-foreground: 41 87% 91%; /* Cream text */
-    --accent-hover: 199 100% 18%; /* Slightly lighter navy */
+    /* Accent (CTA) */
+    --accent: 19 100% 65%; /* #FF844B */
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 19 100% 55%;
 
-    /* Success Green for healthy stock */
+    /* Success Green */
     --success: 142 76% 36%;
-    --success-foreground: 41 87% 91%;
+    --success-foreground: 210 40% 98%;
 
-    /* Warning Orange for low stock */
-    --warning: 38 92% 50%;
-    --warning-foreground: 41 87% 91%;
+    /* Warning (use accent orange) */
+    --warning: 19 100% 65%;
+    --warning-foreground: 0 0% 100%;
 
     /* Destructive Red */
     --destructive: 0 84% 60%;
-    --destructive-foreground: 41 87% 91%;
+    --destructive-foreground: 210 40% 98%;
 
-    /* Neutral borders using steel blue tints */
-    --border: 203 30% 75%; /* Light steel blue border */
-    --input: 203 30% 75%;
-    --ring: 203 40% 57%; /* Steel blue ring */
+    /* Neutrals */
+    --border: 200 20% 80%;
+    --input: 200 20% 80%;
+    --ring: 201 32% 45%;
 
-    /* Gradients with custom colors */
-    --gradient-primary: linear-gradient(135deg, hsl(203, 40%, 57%), hsl(203, 40%, 47%));
-    --gradient-accent: linear-gradient(135deg, hsl(199, 100%, 14%), hsl(199, 100%, 18%));
-    --gradient-hero: linear-gradient(135deg, hsl(203, 40%, 57%) 0%, hsl(199, 100%, 14%) 100%);
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(201 32% 45%), hsl(201 32% 38%));
+    --gradient-accent: linear-gradient(135deg, hsl(19 100% 65%), hsl(19 100% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(201 32% 45%) 0%, hsl(233 58% 9%) 100%);
 
-    /* Shadows with brand colors */
-    --shadow-primary: 0 10px 30px -10px hsl(203 40% 57% / 0.3);
-    --shadow-accent: 0 10px 30px -10px hsl(199 100% 14% / 0.3);
-    --shadow-card: 0 4px 6px -1px hsl(199 100% 14% / 0.1);
+    /* Shadows */
+    --shadow-primary: 0 10px 30px -10px hsl(201 32% 45% / 0.3);
+    --shadow-accent: 0 10px 30px -10px hsl(19 100% 65% / 0.3);
+    --shadow-card: 0 4px 6px -1px hsl(233 58% 9% / 0.08);
 
     --radius: 0.75rem;
 
     /* Sidebar theme */
-    --sidebar-background: 203 40% 57%; /* Steel blue sidebar */
-    --sidebar-foreground: 41 87% 91%; /* Cream text */
-    --sidebar-primary: 199 100% 14%; /* Deep navy for active items */
-    --sidebar-primary-foreground: 41 87% 91%;
-    --sidebar-accent: 203 40% 67%; /* Lighter steel blue */
-    --sidebar-accent-foreground: 41 87% 91%;
-    --sidebar-border: 203 40% 47%; /* Darker steel blue border */
-    --sidebar-ring: 199 100% 14%;
+    --sidebar-background: 201 32% 45%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 19 100% 65%;
+    --sidebar-primary-foreground: 233 58% 9%;
+    --sidebar-accent: 201 32% 55%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 201 32% 38%;
+    --sidebar-ring: 201 32% 45%;
   }
 
   .dark {
-    /* Dark mode - Deep Navy Theme */
-    --background: 199 100% 8%; /* Very dark navy */
-    --foreground: 41 87% 91%; /* Cream text */
+    /* Dark mode tuned to the new palette */
+    --background: 233 58% 6%;
+    --foreground: 200 36% 92%;
 
-    --card: 199 100% 12%; /* Slightly lighter navy card */
-    --card-foreground: 41 87% 91%;
+    --card: 233 45% 10%;
+    --card-foreground: 200 36% 92%;
 
-    --popover: 199 100% 12%;
-    --popover-foreground: 41 87% 91%;
+    --popover: 233 45% 10%;
+    --popover-foreground: 200 36% 92%;
 
-    --primary: 203 40% 57%; /* Steel blue stays vibrant in dark mode */
-    --primary-foreground: 199 100% 8%; /* Dark navy text on steel blue */
-    --primary-variant: 203 40% 67%; /* Lighter steel blue */
+    --primary: 201 32% 45%;
+    --primary-foreground: 210 40% 98%;
+    --primary-variant: 201 32% 55%;
 
-    --secondary: 199 100% 18%; /* Lighter navy */
-    --secondary-foreground: 41 87% 91%;
+    --secondary: 233 58% 12%;
+    --secondary-foreground: 200 36% 92%;
 
-    --muted: 199 80% 20%; /* Muted dark navy */
-    --muted-foreground: 203 30% 70%; /* Muted steel blue */
+    --muted: 233 30% 20%;
+    --muted-foreground: 200 20% 70%;
 
-    --accent: 203 40% 57%; /* Steel blue accent in dark mode */
-    --accent-foreground: 199 100% 8%;
-    --accent-hover: 203 40% 67%;
+    --accent: 19 100% 65%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 19 100% 55%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 41 87% 91%;
+    --success: 142 70% 40%;
+    --success-foreground: 210 40% 98%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 41 87% 91%;
+    --warning: 19 100% 65%;
+    --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 41 87% 91%;
+    --destructive: 0 70% 52%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 199 80% 25%; /* Navy border */
-    --input: 199 80% 25%;
-    --ring: 203 40% 57%; /* Steel blue ring */
+    --border: 233 30% 25%;
+    --input: 233 30% 25%;
+    --ring: 201 32% 45%;
 
     /* Dark mode sidebar */
-    --sidebar-background: 199 100% 6%; /* Darkest navy */
-    --sidebar-foreground: 41 87% 91%;
-    --sidebar-primary: 203 40% 57%; /* Steel blue active items */
-    --sidebar-primary-foreground: 199 100% 8%;
-    --sidebar-accent: 199 100% 18%; /* Lighter navy accent */
-    --sidebar-accent-foreground: 41 87% 91%;
-    --sidebar-border: 199 100% 15%;
-    --sidebar-ring: 203 40% 57%;
+    --sidebar-background: 233 58% 6%;
+    --sidebar-foreground: 200 36% 92%;
+    --sidebar-primary: 19 100% 65%;
+    --sidebar-primary-foreground: 233 58% 9%;
+    --sidebar-accent: 233 30% 20%;
+    --sidebar-accent-foreground: 200 36% 92%;
+    --sidebar-border: 233 30% 20%;
+    --sidebar-ring: 201 32% 45%;
   }
 }
 

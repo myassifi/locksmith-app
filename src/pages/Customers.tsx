@@ -56,7 +56,7 @@ export default function Customers() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'in_progress': return 'bg-primary/10 text-primary dark:bg-primary/20';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
@@ -370,7 +370,7 @@ export default function Customers() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Customer Value</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${avgCustomerValue.toFixed(0)}</div>
@@ -381,7 +381,7 @@ export default function Customers() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">VIP Customers</CardTitle>
-            <Award className="h-4 w-4 text-purple-600" />
+            <Award className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{vipCustomers}</div>
@@ -428,7 +428,7 @@ export default function Customers() {
           </Badge>
           <Badge
             variant={filterBy === 'vip' ? 'default' : 'outline'}
-            className="cursor-pointer hover:bg-purple-500 hover:text-white transition-colors px-3 py-1 border-purple-500 text-purple-600"
+            className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors px-3 py-1 border-accent text-accent"
             onClick={() => setFilterBy('vip')}
           >
             ⭐ VIP ({customers.filter(c => (c.total_revenue || 0) > 500).length})
@@ -446,7 +446,7 @@ export default function Customers() {
           </Badge>
           <Badge
             variant={filterBy === 'new' ? 'default' : 'outline'}
-            className="cursor-pointer hover:bg-blue-500 hover:text-white transition-colors px-3 py-1 border-blue-500 text-blue-600"
+            className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1 border-primary text-primary"
             onClick={() => setFilterBy('new')}
           >
             ✨ New ({customers.filter(c => {
@@ -711,7 +711,7 @@ export default function Customers() {
                       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
                       return new Date(customer.created_at) > oneMonthAgo;
                     })() && (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                      <Badge variant="secondary" className="bg-primary/10 text-primary dark:bg-primary/20">
                         <Sparkles className="h-3 w-3 mr-1" />
                         New
                       </Badge>
