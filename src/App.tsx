@@ -13,9 +13,9 @@ import Inventory from "./pages/Inventory";
 import Actions from "./pages/Actions";
 import Settings from "./pages/Settings";
 import Documentation from "./pages/Documentation";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import SignUp from "./pages/SignUp";
+import Landing from "./pages/landing";
+import Login from "./pages/login";
+import SignUp from "./pages/signup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
