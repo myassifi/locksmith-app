@@ -19,6 +19,16 @@ export function Layout({ children }: LayoutProps) {
   const { signOut, user } = useAuth();
   const { theme, setTheme } = useTheme();
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Force a full page reload to clear all state
+      window.location.replace('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full smooth-scroll bg-background text-foreground">
@@ -58,16 +68,15 @@ export function Layout({ children }: LayoutProps) {
                 <span className="sr-only">Toggle theme</span>
               </Button>
               <div className="hidden md:flex flex-col items-end">
-                <span className="text-sm font-medium text-foreground">Welcome</span>
-                <span className="text-xs text-muted-foreground truncate max-w-[150px] lg:max-w-none">
-                  {user?.email}
+                <span className="text-sm font-medium text-foreground">
+                  {`Welcome${user?.user_metadata?.business_name ? `, ${user.user_metadata.business_name}` : ''}`}
                 </span>
               </div>
               
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="gap-1 sm:gap-2 responsive-btn touch-target hover:bg-destructive/10 hover:text-destructive transition-colors"
               >
                 <LogOut className="h-4 w-4" />

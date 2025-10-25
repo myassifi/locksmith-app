@@ -11,7 +11,11 @@ import Customers from "./pages/Customers";
 import Jobs from "./pages/Jobs";
 import Inventory from "./pages/Inventory";
 import Actions from "./pages/Actions";
-import Auth from "./pages/Auth";
+import Settings from "./pages/Settings";
+import Documentation from "./pages/Documentation";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,21 +31,32 @@ function AppRoutes() {
     );
   }
 
-  if (!user) {
-    return <Auth />;
+  // Authenticated routes
+  if (user) {
+    return (
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/actions" element={<Actions />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/documentation" element={<Documentation />} />
+          <Route path="*" element={<Dashboard />} />
+        </Routes>
+      </Layout>
+    );
   }
 
+  // Public routes (non-authenticated)
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/customers" element={<Customers />} />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/actions" element={<Actions />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUp />} />
+      <Route path="*" element={<Landing />} />
+    </Routes>
   );
 }
 

@@ -5,7 +5,8 @@ import {
   Briefcase,
   Package,
   Zap,
-  Flame
+  Flame,
+  Settings
 } from 'lucide-react';
 import {
   Sidebar,
@@ -25,6 +26,7 @@ const menuItems = [
   { title: 'Jobs', url: '/jobs', icon: Briefcase },
   { title: 'Inventory', url: '/inventory', icon: Package },
   { title: 'Activity Tracker', url: '/actions', icon: Zap },
+  { title: 'Settings', url: '/settings', icon: Settings },
 ];
 
 export function AppSidebar() {
