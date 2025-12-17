@@ -39,5 +39,68 @@ All colors MUST be HSL.
     /* Success Green */
     --success: 142 76% 36%;
     --success-foreground: 210 40% 98%;
+
+    /* System */
+    --border: 201 20% 80%;
+    --input: 201 20% 80%;
+    --ring: 201 32% 45%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 233 58% 9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 19 100% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 201 32% 45%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 233 40% 20%;
+    --sidebar-ring: 201 32% 60%;
+  }
+
+  .dark {
+    --background: 233 58% 9%;
+    --foreground: 210 40% 98%;
+
+    --card: 233 45% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 233 45% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 201 32% 60%;
+    --primary-foreground: 210 40% 98%;
+    --primary-variant: 201 32% 50%;
+
+    --secondary: 233 40% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 233 35% 20%;
+    --muted-foreground: 210 20% 80%;
+
+    --accent: 19 90% 60%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 19 90% 55%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --border: 233 30% 25%;
+    --input: 233 30% 25%;
+    --ring: 201 32% 60%;
+
+    --sidebar-background: 233 58% 9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 19 100% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 201 32% 55%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 233 40% 20%;
+    --sidebar-ring: 201 32% 65%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
   }
 }
