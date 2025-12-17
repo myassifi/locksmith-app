@@ -26,7 +26,7 @@ export function FloatingActionButton() {
   return (
     <Button
       size="icon"
-      className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg md:hidden z-40"
+      className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg md:hidden z-40 bg-gradient-to-r from-accent to-primary text-accent-foreground hover:opacity-90"
       onClick={handleClick}
     >
       <Plus className="h-6 w-6" />

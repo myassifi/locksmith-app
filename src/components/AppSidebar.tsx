@@ -17,9 +17,9 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <div className="flex h-full flex-col">
-        <div className="flex h-14 items-center border-b px-6">
+        <div className="flex h-14 items-center border-b px-6 bg-gradient-to-r from-primary to-accent text-primary-foreground">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <Flame className="h-6 w-6 text-primary" />
+            <Flame className="h-6 w-6 text-accent" />
             <span className="text-lg">Heat Wave</span>
           </Link>
         </div>
@@ -34,8 +34,8 @@ export function AppSidebar() {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    ? 'bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-primary/10 hover:text-foreground'
                 )}
               >
                 <Icon className="h-5 w-5" />
