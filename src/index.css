@@ -103,4 +103,26 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Mobile optimizations */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+
+  .mobile-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .mobile-card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+  }
+
+  /* Hide scrollbar for clean mobile horizontal scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

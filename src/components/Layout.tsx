@@ -43,9 +43,9 @@ export function Layout({ children }: LayoutProps) {
               </SidebarTrigger>
               
               <div className="flex items-center gap-2 min-w-0 lg:hidden">
-                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-white flex-shrink-0" />
+                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 fill-orange-500 flex-shrink-0" />
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-white truncate">
+                  <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">
                     <span className="hidden sm:inline">Heat Wave Locksmith</span>
                     <span className="sm:hidden">Heat Wave</span>
                   </h1>
@@ -86,7 +86,7 @@ export function Layout({ children }: LayoutProps) {
           </header>
 
           {/* Main content with improved mobile layout */}
-          <main className="flex-1 mobile-container py-4 sm:py-6 smooth-scroll overflow-auto relative">
+          <main className="flex-1 mobile-container py-4 sm:py-6 pb-24 md:pb-6 smooth-scroll overflow-auto relative">
             <div className="max-w-7xl mx-auto">
               {children}
             </div>

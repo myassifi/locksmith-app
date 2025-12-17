@@ -19,7 +19,7 @@ export function AppSidebar() {
       <div className="flex h-full flex-col">
         <div className="flex h-14 items-center border-b px-6 bg-gradient-to-r from-primary to-accent text-primary-foreground">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <Flame className="h-6 w-6 text-accent" />
+            <Flame className="h-6 w-6 text-orange-500 fill-orange-500" />
             <span className="text-lg">Heat Wave</span>
           </Link>
         </div>

@@ -141,6 +141,14 @@ export default function InventoryNew() {
 
   useEffect(() => {
     loadInventory();
+
+    const handleOpenAdd = () => {
+      resetForm();
+      setDialogOpen(true);
+    };
+
+    window.addEventListener('openAddInventory', handleOpenAdd);
+    return () => window.removeEventListener('openAddInventory', handleOpenAdd);
   }, []);
 
   const loadInventory = async () => {

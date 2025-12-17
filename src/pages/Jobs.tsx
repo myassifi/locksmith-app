@@ -111,6 +111,14 @@ export default function Jobs() {
   useEffect(() => {
     loadJobs();
     loadCustomers();
+
+    const handleOpenAdd = () => {
+      resetForm();
+      setDialogOpen(true);
+    };
+
+    window.addEventListener('openAddJob', handleOpenAdd);
+    return () => window.removeEventListener('openAddJob', handleOpenAdd);
   }, []);
 
   // Realtime updates for jobs via Socket.IO

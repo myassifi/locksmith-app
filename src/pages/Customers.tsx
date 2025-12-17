@@ -62,6 +62,14 @@ export default function Customers() {
 
   useEffect(() => {
     loadCustomers();
+
+    const handleOpenAdd = () => {
+      resetForm();
+      setDialogOpen(true);
+    };
+
+    window.addEventListener('openAddCustomer', handleOpenAdd);
+    return () => window.removeEventListener('openAddCustomer', handleOpenAdd);
   }, []);
 
   // Real-time updates via Socket.IO

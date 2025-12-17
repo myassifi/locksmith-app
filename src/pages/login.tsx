@@ -63,7 +63,7 @@ export default function Login() {
             Back
           </Button>
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Flame className="h-8 w-8 text-accent" />
+            <Flame className="h-8 w-8 text-orange-500 fill-orange-500" />
             <div>
               <CardTitle className="text-2xl text-primary">Heat Wave Locksmith</CardTitle>
               <CardDescription>Welcome back</CardDescription>
