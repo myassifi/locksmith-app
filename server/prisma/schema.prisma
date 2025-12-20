@@ -70,6 +70,7 @@ model InventoryItem {
   fccId             String?
   category          String?
   make              String?
+  model             String?
   keyType           String?
   module            String?
   yearFrom          Int?

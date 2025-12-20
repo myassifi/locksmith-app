@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { api } from '@/integrations/api/client';
 import { useInventorySocket } from '@/hooks/useSocket';
 import { InventoryDataTable } from '@/components/inventory/InventoryDataTable';
+import { InventoryGridCard } from '@/components/inventory/InventoryGridCard';
 import { SwipeableInventoryCard } from '@/components/mobile/SwipeableCard';
 import { PageShell } from '@/components/mobile/PageShell';
 import { InventoryFilters } from '@/components/inventory/InventoryFilters';
@@ -29,6 +30,7 @@ interface InventoryItem {
   supplier?: string;
   category?: string;
   make?: string;
+  model?: string;
   module?: string;
   total_cost_value?: number;
   fcc_id?: string;
@@ -36,6 +38,7 @@ interface InventoryItem {
   year_from?: number;
   year_to?: number;
   image_url?: string;
+  created_at?: string;
 }
 
 interface FilterState {
@@ -71,6 +74,7 @@ export default function InventoryNew() {
   const [searchSuggestions, setSearchSuggestions] = useState<InventoryItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -1044,6 +1048,26 @@ export default function InventoryNew() {
                 <SelectItem value="low-stock">Low Stock First</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* View Toggle - Desktop Only */}
+            <div className="hidden lg:flex items-center gap-1 border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Active Filters */}
@@ -1151,14 +1175,27 @@ export default function InventoryNew() {
             </div>
           )}
 
-          {/* Desktop Table View */}
+          {/* Desktop View - Grid or List */}
           <div className="hidden lg:block">
-            <InventoryDataTable
-              data={filteredInventory}
-              onQuantityChange={handleQuantityChange}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                {filteredInventory.map((item) => (
+                  <InventoryGridCard
+                    key={item.id}
+                    item={item}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            ) : (
+              <InventoryDataTable
+                data={filteredInventory}
+                onQuantityChange={handleQuantityChange}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
           </div>
 
           {/* Mobile Card View with Swipe Actions */}
