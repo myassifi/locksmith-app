@@ -126,7 +126,13 @@ async function authMiddleware(req: AuthRequest, res: Response, next: NextFunctio
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
+    node: process.version,
+    env: process.env.NODE_ENV || null,
+  });
 });
 
 // File upload endpoint
