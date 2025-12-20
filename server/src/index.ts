@@ -5,10 +5,42 @@ import { Server as SocketIOServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const prisma = new PrismaClient();
 const app = express();
 const server = http.createServer(app);
+
+// Configure multer for file uploads
+const uploadDir = path.join(__dirname, '..', 'uploads');
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only image files are allowed'));
+  }
+});
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
@@ -52,6 +84,8 @@ app.use(
   })
 );
 app.use(express.json());
+// Serve static files from uploads directory
+app.use('/uploads', express.static(uploadDir));
 
 // Socket.IO connection
 io.on('connection', (socket) => {
@@ -93,6 +127,15 @@ async function authMiddleware(req: AuthRequest, res: Response, next: NextFunctio
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// File upload endpoint
+app.post('/api/upload', authMiddleware, upload.single('image'), (req: AuthRequest, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
 });
 
 // ============ AUTH ============
@@ -219,13 +262,15 @@ app.get('/api/inventory', authMiddleware, async (req: AuthRequest, res) => {
 
 app.post('/api/inventory', authMiddleware, async (req: AuthRequest, res) => {
   try {
+    console.log('Creating inventory item with data:', req.body);
     const item = await prisma.inventoryItem.create({
       data: { ...req.body, userId: req.userId },
     });
     emitChange('inventory:changed');
     res.json(item);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create inventory item' });
+    console.error('Failed to create inventory item:', error);
+    res.status(500).json({ error: 'Failed to create inventory item', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

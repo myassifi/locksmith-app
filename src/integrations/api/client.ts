@@ -21,11 +21,19 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const buildHeaders = (withAuth: boolean): HeadersInit => ({
-      'Content-Type': 'application/json',
-      ...(withAuth && this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-      ...options.headers,
-    });
+    const isFormData = options.body instanceof FormData;
+    const buildHeaders = (withAuth: boolean): HeadersInit => {
+      const headers: any = {
+        ...(withAuth && this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+        ...options.headers,
+      };
+      
+      if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+      }
+      
+      return headers;
+    };
 
     const doFetch = (withAuth: boolean) =>
       fetch(`${API_URL}${endpoint}`, {
@@ -80,6 +88,16 @@ class ApiClient {
 
   logout() {
     this.setToken(null);
+  }
+
+  // Upload
+  async uploadImage(file: File) {
+    const formData = new FormData();
+    formData.append('image', file);
+    return this.request<{ url: string }>('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
   }
 
   // Inventory

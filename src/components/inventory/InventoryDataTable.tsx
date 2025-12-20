@@ -5,31 +5,43 @@ import { formatCurrency } from '@/lib/format';
 
 interface InventoryItem {
   id: string;
-  item_name: string;
-  sku?: string;
-  fcc_id?: string;
-  make?: string;
+  item_name?: string;
+  sku: string;
+  key_type: string;
   quantity: number;
-  unit_cost: number;
-  reorder_threshold?: number;
+  cost?: number;
   supplier?: string;
+  category?: string;
+  make?: string;
+  model?: string;
+  module?: string;
+  total_cost_value?: number;
+  fcc_id?: string;
+  low_stock_threshold?: number;
+  year_from?: number;
+  year_to?: number;
+  image_url?: string;
+  created_at?: string;
 }
 
 interface InventoryDataTableProps {
-  items: InventoryItem[];
+  data: InventoryItem[];
+  onQuantityChange: (id: string, newQuantity: number) => Promise<void>;
   onEdit: (item: InventoryItem) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
 }
 
-export function InventoryDataTable({ items, onEdit, onDelete }: InventoryDataTableProps) {
+export function InventoryDataTable({ data, onQuantityChange, onEdit, onDelete }: InventoryDataTableProps) {
   return (
     <div className="rounded-md border">
       <table className="w-full">
         <thead>
           <tr className="border-b bg-muted/50">
+            <th className="p-3 text-left text-sm font-medium w-[60px]">Image</th>
             <th className="p-3 text-left text-sm font-medium">Item Name</th>
             <th className="p-3 text-left text-sm font-medium">SKU</th>
             <th className="p-3 text-left text-sm font-medium">Make</th>
+            <th className="p-3 text-left text-sm font-medium">Model</th>
             <th className="p-3 text-right text-sm font-medium">Quantity</th>
             <th className="p-3 text-right text-sm font-medium">Unit Cost</th>
             <th className="p-3 text-left text-sm font-medium">Supplier</th>
@@ -37,10 +49,23 @@ export function InventoryDataTable({ items, onEdit, onDelete }: InventoryDataTab
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => {
-            const isLowStock = item.reorder_threshold && item.quantity <= item.reorder_threshold;
+          {data.map((item) => {
+            const isLowStock = item.low_stock_threshold && item.quantity <= item.low_stock_threshold;
             return (
               <tr key={item.id} className="border-b hover:bg-muted/50">
+                <td className="p-3">
+                  <div className="h-10 w-10 rounded-md overflow-hidden bg-muted flex items-center justify-center border">
+                    {item.image_url ? (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.item_name} 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No img</div>
+                    )}
+                  </div>
+                </td>
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{item.item_name}</span>
@@ -51,8 +76,9 @@ export function InventoryDataTable({ items, onEdit, onDelete }: InventoryDataTab
                 </td>
                 <td className="p-3 text-sm text-muted-foreground">{item.sku || '-'}</td>
                 <td className="p-3 text-sm text-muted-foreground">{item.make || '-'}</td>
+                <td className="p-3 text-sm text-muted-foreground">{item.model || '-'}</td>
                 <td className="p-3 text-right font-medium">{item.quantity}</td>
-                <td className="p-3 text-right">{formatCurrency(item.unit_cost)}</td>
+                <td className="p-3 text-right">{formatCurrency(item.cost || 0)}</td>
                 <td className="p-3 text-sm text-muted-foreground">{item.supplier || '-'}</td>
                 <td className="p-3">
                   <div className="flex justify-end gap-2">

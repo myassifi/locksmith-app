@@ -35,7 +35,7 @@ interface InventoryItem {
   low_stock_threshold?: number;
   year_from?: number;
   year_to?: number;
-  created_at?: string;
+  image_url?: string;
 }
 
 interface FilterState {
@@ -70,6 +70,7 @@ export default function InventoryNew() {
   });
   const [searchSuggestions, setSearchSuggestions] = useState<InventoryItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -89,20 +90,24 @@ export default function InventoryNew() {
     supplier: '',
     category: 'Prox / Smart Keys',
     make: '',
+    model: '',
     module: '',
     year_from: '',
     year_to: '',
     fcc_id: '',
     low_stock_threshold: '3',
+    image_url: '',
   });
 
   // Auto-generate item name
   useEffect(() => {
-    if (formData.make && formData.year_from && formData.category) {
-      const itemName = `${formData.make} ${formData.year_from} ${formData.category}`;
+    if (formData.make && formData.model && formData.category) {
+      const modelPart = formData.model ? ` ${formData.model}` : '';
+      const yearPart = formData.year_from ? ` ${formData.year_from}` : '';
+      const itemName = `${formData.make}${modelPart}${yearPart} ${formData.category}`;
       setFormData(prev => ({ ...prev, item_name: itemName }));
     }
-  }, [formData.make, formData.year_from, formData.category]);
+  }, [formData.make, formData.model, formData.year_from, formData.category]);
 
   // Key Categories
   const keyCategories = [
@@ -167,6 +172,7 @@ export default function InventoryNew() {
         supplier: item.supplier || '',
         category: item.category || '',
         make: item.make || '',
+        model: item.model || '',
         module: item.module || '',
         total_cost_value: (item.quantity ?? 0) * (item.cost ?? 0),
         fcc_id: item.fccId || '',
@@ -174,6 +180,7 @@ export default function InventoryNew() {
         year_from: item.yearFrom ?? undefined,
         year_to: item.yearTo ?? undefined,
         created_at: item.createdAt,
+        image_url: item.imageUrl || '',
       }));
       setInventory(mapped);
     } catch (error) {
@@ -221,7 +228,8 @@ export default function InventoryNew() {
         item.sku?.toLowerCase().includes(search) ||
         item.fcc_id?.toLowerCase().includes(search) ||
         item.supplier?.toLowerCase().includes(search) ||
-        item.make?.toLowerCase().includes(search)
+        item.make?.toLowerCase().includes(search) ||
+        (item as any).model?.toLowerCase().includes(search)
       );
     }
 
@@ -377,11 +385,13 @@ export default function InventoryNew() {
       supplier: item.supplier || '',
       category: item.category || 'Prox / Smart Keys',
       make: item.make || '',
+      model: (item as any).model || '',
       module: item.module || '',
       year_from: item.year_from?.toString() || '',
       year_to: item.year_to?.toString() || '',
       fcc_id: item.fcc_id || '',
       low_stock_threshold: (item.low_stock_threshold || 3).toString(),
+      image_url: item.image_url || '',
     });
     setDialogOpen(true);
   };
@@ -404,6 +414,40 @@ export default function InventoryNew() {
         description: "Failed to delete item",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (e.g., max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Image size must be less than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const { url } = await api.uploadImage(file);
+      setFormData(prev => ({ ...prev, image_url: url }));
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully",
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -432,11 +476,13 @@ export default function InventoryNew() {
         supplier: formData.supplier || null,
         category: formData.category,
         make: formData.make || null,
+        model: formData.model || null,
         module: formData.module || null,
         yearFrom: formData.year_from ? parseInt(formData.year_from) : null,
         yearTo: formData.year_to ? parseInt(formData.year_to) : null,
         fccId: formData.fcc_id || null,
         lowStockThreshold: parseInt(formData.low_stock_threshold),
+        imageUrl: formData.image_url || null,
       };
 
       if (editingItem) {
@@ -475,11 +521,13 @@ export default function InventoryNew() {
       supplier: '',
       category: 'Prox / Smart Keys',
       make: '',
+      model: '',
       module: '',
       year_from: '',
       year_to: '',
       fcc_id: '',
       low_stock_threshold: '3',
+      image_url: '',
     });
   };
 
@@ -631,6 +679,7 @@ export default function InventoryNew() {
         item.sku?.toLowerCase().includes(search) ||
         item.fcc_id?.toLowerCase().includes(search) ||
         item.make?.toLowerCase().includes(search) ||
+        (item as any).model?.toLowerCase().includes(search) ||
         item.supplier?.toLowerCase().includes(search)
       )
       .slice(0, 5); // Limit to 5 suggestions
@@ -650,12 +699,13 @@ export default function InventoryNew() {
   // Export to CSV
   const exportToCSV = () => {
     try {
-      const headers = ['Item Name', 'SKU', 'Category', 'Make', 'Year', 'Quantity', 'Cost', 'Total Value', 'Supplier', 'FCC ID'];
+      const headers = ['Item Name', 'SKU', 'Category', 'Make', 'Model', 'Year', 'Quantity', 'Cost', 'Total Value', 'Supplier', 'FCC ID'];
       const rows = filteredInventory.map(item => [
         item.item_name || '',
         item.sku,
         item.category || '',
         item.make || '',
+        (item as any).model || '',
         item.year_from ? `${item.year_from}${item.year_to ? `-${item.year_to}` : ''}` : '',
         item.quantity,
         item.cost?.toFixed(2) || '0.00',
@@ -1030,7 +1080,7 @@ export default function InventoryNew() {
           )}
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="w-full justify-start overflow-x-auto grid grid-cols-5">
               <TabsTrigger value="all" className="gap-2 touch-target">
                 All <Badge variant="secondary" className="ml-1">{stats.all}</Badge>
@@ -1161,116 +1211,84 @@ export default function InventoryNew() {
           )}
           
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-4">
-                <div>
-                  <Label>Item Name (Auto-generated)</Label>
-                  <Input
-                    value={formData.item_name}
-                    onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
-                    placeholder="e.g., Honda 2010 Automotive Keys"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Generated from Make + Year + Category</p>
-                </div>
-
-                <div>
-                  <Label>SKU *</Label>
-                  <Input
-                    value={formData.sku}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, sku: value });
-                      checkForDuplicate('sku', value);
-                    }}
-                    required
-                    placeholder="e.g., XNFO01EN"
-                    className={duplicateField === 'sku' ? 'border-destructive' : ''}
-                  />
-                  {duplicateField === 'sku' && duplicateItem && (
-                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      SKU already exists: {duplicateItem.item_name || duplicateItem.sku}
-                    </p>
+            <div className="grid gap-6">
+              {/* Section 0: Image Upload */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                <h3 className="font-medium flex items-center gap-2 text-primary">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">1</div>
+                  Item Image
+                </h3>
+                <div className="flex items-center gap-4">
+                  {formData.image_url && (
+                    <div className="relative h-24 w-24 rounded-lg overflow-hidden border">
+                      <img 
+                        src={formData.image_url} 
+                        alt="Preview" 
+                        className="h-full w-full object-cover" 
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-0 right-0 h-6 w-6 rounded-none rounded-bl-lg"
+                        onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
-                </div>
-
-                <div>
-                  <Label>Category *</Label>
-                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {keyCategories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Chip Type</Label>
-                  <Input
-                    value={formData.key_type}
-                    onChange={(e) => setFormData({ ...formData, key_type: e.target.value })}
-                    placeholder="e.g., 4C, 4D, 46"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Quantity *</Label>
-                    <Input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                      required
-                      min="0"
-                    />
+                  <div className="flex-1">
+                    <Label htmlFor="image-upload">Upload Image</Label>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                      />
+                      {uploadingImage && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supported formats: JPG, PNG, GIF. Max size: 5MB.
+                    </p>
                   </div>
-                  <div>
-                    <Label>Unit Cost</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.cost}
-                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Low Stock Threshold</Label>
-                  <Input
-                    type="number"
-                    value={formData.low_stock_threshold}
-                    onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                    min="0"
-                  />
                 </div>
               </div>
 
-              {/* Right Column */}
-              <div className="space-y-4">
-                <div>
-                  <Label>Make *</Label>
-                  <Select value={formData.make} onValueChange={(value) => setFormData({ ...formData, make: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select make" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vehicleMakes.map(make => (
-                        <SelectItem key={make} value={make}>{make}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Section 1: Vehicle Information */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                <h3 className="font-medium flex items-center gap-2 text-primary">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">2</div>
+                  Vehicle Compatibility
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Make *</Label>
+                    <Select value={formData.make} onValueChange={(value) => setFormData({ ...formData, make: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select make" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicleMakes.map(make => (
+                          <SelectItem key={make} value={make}>{make}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Model *</Label>
+                    <Input
+                      value={formData.model}
+                      onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                      placeholder="e.g. Civic, F-150"
+                      required
+                    />
+                  </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Year From *</Label>
+                    <Label>Year From</Label>
                     <Select value={formData.year_from} onValueChange={(value) => setFormData({ ...formData, year_from: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Year" />
@@ -1296,41 +1314,133 @@ export default function InventoryNew() {
                     </Select>
                   </div>
                 </div>
-
                 <div>
-                  <Label>FCC ID</Label>
+                  <Label>Item Name (Auto-generated)</Label>
                   <Input
-                    value={formData.fcc_id}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, fcc_id: value });
-                      if (value.trim()) {
-                        checkForDuplicate('fcc_id', value);
-                      }
-                    }}
-                    placeholder="e.g., 2AATX-XKHY01EN"
-                    className={duplicateField === 'fcc_id' ? 'border-destructive' : ''}
+                    value={formData.item_name}
+                    onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                    placeholder="e.g., Honda Civic 2010 Prox Key"
+                    className="bg-muted"
                   />
-                  {duplicateField === 'fcc_id' && duplicateItem && (
-                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      FCC ID already exists: {duplicateItem.item_name || duplicateItem.sku}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Automatically built from vehicle details</p>
                 </div>
+              </div>
 
+              {/* Section 2: Key Details */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                <h3 className="font-medium flex items-center gap-2 text-primary">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">2</div>
+                  Key Details
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Category *</Label>
+                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {keyCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>FCC ID</Label>
+                    <Input
+                      value={formData.fcc_id}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData({ ...formData, fcc_id: value });
+                        if (value.trim()) checkForDuplicate('fcc_id', value);
+                      }}
+                      placeholder="e.g., KR55WK49303"
+                      className={duplicateField === 'fcc_id' ? 'border-destructive' : ''}
+                    />
+                    {duplicateField === 'fcc_id' && duplicateItem && (
+                      <p className="text-xs text-destructive mt-1">Already exists: {duplicateItem.item_name}</p>
+                    )}
+                  </div>
+                </div>
                 <div>
-                  <Label>Supplier</Label>
-                  <Select value={formData.supplier} onValueChange={(value) => setFormData({ ...formData, supplier: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map(supplier => (
-                        <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Chip Type</Label>
+                  <Input
+                    value={formData.key_type}
+                    onChange={(e) => setFormData({ ...formData, key_type: e.target.value })}
+                    placeholder="e.g., ID46, 4D63, MQB"
+                  />
+                </div>
+              </div>
+
+              {/* Section 3: Inventory Information */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                <h3 className="font-medium flex items-center gap-2 text-primary">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">3</div>
+                  Stock & Pricing
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>SKU *</Label>
+                    <Input
+                      value={formData.sku}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData({ ...formData, sku: value });
+                        checkForDuplicate('sku', value);
+                      }}
+                      required
+                      placeholder="e.g., HO03-PT"
+                      className={duplicateField === 'sku' ? 'border-destructive' : ''}
+                    />
+                    {duplicateField === 'sku' && duplicateItem && (
+                      <p className="text-xs text-destructive mt-1">SKU taken</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>Supplier</Label>
+                    <Select value={formData.supplier} onValueChange={(value) => setFormData({ ...formData, supplier: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map(supplier => (
+                          <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Quantity *</Label>
+                    <Input
+                      type="number"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      required
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <Label>Unit Cost</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.cost}
+                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label>Low Stock</Label>
+                    <Input
+                      type="number"
+                      value={formData.low_stock_threshold}
+                      onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
+                      min="0"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

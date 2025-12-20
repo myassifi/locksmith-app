@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -78,6 +78,7 @@ model InventoryItem {
   cost              Float    @default(0)
   price             Float    @default(0)
   supplier          String?
+  imageUrl          String?
   lowStockThreshold Int      @default(5)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

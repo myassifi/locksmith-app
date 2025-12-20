@@ -8,12 +8,21 @@ interface InventoryItem {
   id: string;
   item_name?: string;
   sku: string;
+  key_type: string;
   quantity: number;
   cost?: number;
   supplier?: string;
-  low_stock_threshold?: number;
+  category?: string;
   make?: string;
+  model?: string;
+  module?: string;
+  total_cost_value?: number;
   fcc_id?: string;
+  low_stock_threshold?: number;
+  year_from?: number;
+  year_to?: number;
+  image_url?: string;
+  created_at?: string;
 }
 
 interface SwipeableInventoryCardProps {
@@ -29,23 +38,43 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
   return (
     <Card className="relative overflow-hidden mb-3">
       <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex-1 mr-2">
-            <h3 className="font-semibold text-base line-clamp-1">{item.item_name || 'Unnamed Item'}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-xs font-normal">
-                {item.sku}
-              </Badge>
-              {isLowStock && (
-                <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5">
-                  Low Stock
-                </Badge>
-              )}
-            </div>
+        <div className="flex gap-3">
+          {/* Image Thumbnail */}
+          <div className="h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted border">
+            {item.image_url ? (
+              <img 
+                src={item.image_url} 
+                alt={item.item_name} 
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground bg-muted/50">
+                No img
+              </div>
+            )}
           </div>
-          <div className="text-right">
-             <div className="font-semibold">{formatCurrency(item.cost || 0)}</div>
-             <div className="text-xs text-muted-foreground">{item.make}</div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start mb-1">
+              <div className="flex-1 mr-2 min-w-0">
+                <h3 className="font-semibold text-base truncate">{item.item_name || 'Unnamed Item'}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {item.sku}
+                  </Badge>
+                  {isLowStock && (
+                    <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5">
+                      Low Stock
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                 <div className="font-semibold">{formatCurrency(item.cost || 0)}</div>
+                 <div className="text-xs text-muted-foreground">{item.make} {item.model}</div>
+              </div>
+            </div>
           </div>
         </div>
 
