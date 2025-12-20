@@ -4,9 +4,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "prisma generate && prisma migrate deploy && tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "postinstall": "prisma generate",
+    "build": "npx prisma generate && tsc -p tsconfig.json",
+    "start": "npx prisma migrate deploy && node dist/index.js",
+    "postinstall": "npx prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
