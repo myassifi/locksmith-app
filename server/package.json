@@ -7,8 +7,10 @@
   },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "prisma generate --schema ${PRISMA_SCHEMA:-prisma/schema.prisma} && tsc",
-    "start": "prisma db push --schema ${PRISMA_SCHEMA:-prisma/schema.prisma} && node dist/index.js",
+    "build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
+    "start": "prisma db push --schema prisma/schema.postgres.prisma && node dist/index.js",
+    "railway:build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
+    "railway:start": "prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

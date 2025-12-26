@@ -12,3 +12,6 @@ dist
 .vscode
 
 *.db
+
+# Don't commit bun.lockb if using npm
+bun.lockb

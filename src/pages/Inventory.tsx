@@ -445,9 +445,10 @@ export default function InventoryNew() {
       });
     } catch (error) {
       console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload image';
       toast({
         title: "Error",
-        description: "Failed to upload image",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
