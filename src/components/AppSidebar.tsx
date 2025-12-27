@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/ui/sidebar';
-import { Home, Package, Users, Briefcase, FileText, Flame } from 'lucide-react';
+import { Home, Package, Users, Briefcase, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -8,7 +8,6 @@ const navItems = [
   { to: '/inventory', icon: Package, label: 'Inventory' },
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
-  { to: '/documentation', icon: FileText, label: 'Documentation' },
 ];
 
 export function AppSidebar() {

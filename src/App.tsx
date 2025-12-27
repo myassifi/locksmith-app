@@ -13,7 +13,6 @@ import Jobs from "./pages/Jobs";
 import Inventory from "./pages/Inventory";
 import Actions from "./pages/Actions";
 import Settings from "./pages/Settings";
-import Documentation from "./pages/Documentation";
 import Login from "./pages/login";
 
 const queryClient = new QueryClient();
@@ -58,7 +57,6 @@ function AppRoutes() {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/actions" element={<Actions />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/documentation" element={<Documentation />} />
         <Route path="*" element={<Dashboard />} />
       </Route>
     </Routes>
