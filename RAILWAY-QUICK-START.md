@@ -65,7 +65,6 @@ git push -u origin main
    DATABASE_URL = ${{Postgres.DATABASE_URL}}
    JWT_SECRET = heatwave-secret-2024-abc123
    CORS_ORIGIN = *
-   PORT = 4000
    NODE_ENV = production
    ```
 3. Click "Settings":
@@ -82,14 +81,12 @@ git push -u origin main
 1. Click "+ New" → "GitHub Repo" → Select same repo
 2. Click "Variables" and add:
    ```
-   VITE_SUPABASE_PROJECT_ID = vmrxwbvbycijhqrdwkdc
-   VITE_SUPABASE_PUBLISHABLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtcnh3YnZieWNpamhxcmR3a2RjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMjYyOTUsImV4cCI6MjA3MzkwMjI5NX0.T0RJUojWM_Dz5Wqk2tkTAqVrWwDr-eqQmSX4aPGQS5E
-   VITE_SUPABASE_URL = https://vmrxwbvbycijhqrdwkdc.supabase.co
    VITE_API_URL = YOUR_BACKEND_URL_FROM_STEP_4
    ```
 3. Click "Settings":
    - Root Directory: `/`
    - Build Command: `npm run build`
+   - Start Command: Leave empty (Nixpacks uses `nixpacks.toml` and runs `vite preview`)
 4. Click "Settings" → "Networking" → "Generate Domain"
 5. Click "Deploy"
 

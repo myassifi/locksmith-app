@@ -1,5 +1,57 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
+type AnyRecord = Record<string, any>;
+
+function mapInventoryToApi(data: AnyRecord): AnyRecord {
+  const mapped: AnyRecord = { ...data };
+
+  if (mapped.item_name !== undefined && mapped.itemName === undefined) {
+    mapped.itemName = mapped.item_name;
+    delete mapped.item_name;
+  }
+  if (mapped.key_type !== undefined && mapped.keyType === undefined) {
+    mapped.keyType = mapped.key_type;
+    delete mapped.key_type;
+  }
+  if (mapped.fcc_id !== undefined && mapped.fccId === undefined) {
+    mapped.fccId = mapped.fcc_id;
+    delete mapped.fcc_id;
+  }
+  if (mapped.low_stock_threshold !== undefined && mapped.lowStockThreshold === undefined) {
+    mapped.lowStockThreshold = mapped.low_stock_threshold;
+    delete mapped.low_stock_threshold;
+  }
+  if (mapped.year_from !== undefined && mapped.yearFrom === undefined) {
+    mapped.yearFrom = mapped.year_from;
+    delete mapped.year_from;
+  }
+  if (mapped.year_to !== undefined && mapped.yearTo === undefined) {
+    mapped.yearTo = mapped.year_to;
+    delete mapped.year_to;
+  }
+  if (mapped.image_url !== undefined && mapped.imageUrl === undefined) {
+    mapped.imageUrl = mapped.image_url;
+    delete mapped.image_url;
+  }
+
+  return mapped;
+}
+
+function mapInventoryFromApi(item: AnyRecord): AnyRecord {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    item_name: item.itemName ?? item.item_name,
+    key_type: item.keyType ?? item.key_type,
+    fcc_id: item.fccId ?? item.fcc_id,
+    low_stock_threshold: item.lowStockThreshold ?? item.low_stock_threshold,
+    year_from: item.yearFrom ?? item.year_from,
+    year_to: item.yearTo ?? item.year_to,
+    image_url: item.imageUrl ?? item.image_url,
+    created_at: item.createdAt ?? item.created_at,
+  };
+}
+
 class ApiClient {
   private token: string | null = null;
 
@@ -102,21 +154,24 @@ class ApiClient {
 
   // Inventory
   async getInventory() {
-    return this.request<any[]>('/api/inventory');
+    const items = await this.request<any[]>('/api/inventory');
+    return (items || []).map(mapInventoryFromApi);
   }
 
   async createInventoryItem(data: any) {
-    return this.request<any>('/api/inventory', {
+    const created = await this.request<any>('/api/inventory', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(mapInventoryToApi(data)),
     });
+    return mapInventoryFromApi(created);
   }
 
   async updateInventoryItem(id: string, data: any) {
-    return this.request<any>(`/api/inventory/${id}`, {
+    const updated = await this.request<any>(`/api/inventory/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(mapInventoryToApi(data)),
     });
+    return mapInventoryFromApi(updated);
   }
 
   async deleteInventoryItem(id: string) {

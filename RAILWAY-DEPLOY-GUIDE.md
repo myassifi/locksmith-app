@@ -101,12 +101,11 @@ git push -u origin main
 3. **Set Environment Variables:**
    
    Click "Variables" tab and add these:
-
+   
    ```
    DATABASE_URL = ${{Postgres.DATABASE_URL}}
    JWT_SECRET = heatwave-locksmith-railway-secret-2024-abc123xyz
    CORS_ORIGIN = *
-   PORT = 4000
    NODE_ENV = production
    ```
 
@@ -138,9 +137,6 @@ git push -u origin main
    Click "Variables" tab and add:
 
    ```
-   VITE_SUPABASE_PROJECT_ID = vmrxwbvbycijhqrdwkdc
-   VITE_SUPABASE_PUBLISHABLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtcnh3YnZieWNpamhxcmR3a2RjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMjYyOTUsImV4cCI6MjA3MzkwMjI5NX0.T0RJUojWM_Dz5Wqk2tkTAqVrWwDr-eqQmSX4aPGQS5E
-   VITE_SUPABASE_URL = https://vmrxwbvbycijhqrdwkdc.supabase.co
    VITE_API_URL = YOUR_BACKEND_URL_FROM_STEP_5
    ```
 
@@ -151,7 +147,7 @@ git push -u origin main
    Click "Settings" tab:
    - **Root Directory:** `/` (leave empty or just `/`)
    - **Build Command:** `npm run build`
-   - **Start Command:** Leave empty (static site)
+   - **Start Command:** Leave empty (Nixpacks uses `nixpacks.toml` and runs `vite preview`)
    - **Watch Paths:** `src/**`
 
 4. **Add Static Site Settings:**
