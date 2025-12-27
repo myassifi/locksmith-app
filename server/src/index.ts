@@ -447,6 +447,25 @@ app.get('/api/subscription', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+const clientDistPath = path.join(__dirname, '..', '..', 'dist');
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/auth') ||
+      req.path.startsWith('/uploads') ||
+      req.path === '/health'
+    ) {
+      return next();
+    }
+
+    return res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
 // ============ START SERVER ============
 
 const PORT = process.env.PORT || 4000;

@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-
 let socket: Socket | null = null;
 
 function getSocket() {
   if (!socket) {
-    socket = io(SOCKET_URL, {
+    const SOCKET_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
+    const options = {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-    });
+      transports: ['websocket', 'polling'],
+    };
+
+    socket = SOCKET_URL ? io(SOCKET_URL, options) : io(options);
   }
   return socket;
 }

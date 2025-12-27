@@ -380,12 +380,13 @@ export default function Customers() {
           <h1 className="text-3xl font-bold text-primary">Customers</h1>
           
           <div className="flex items-center gap-2 flex-wrap">
-            <SearchBar
-              placeholder="Search customers..."
-              onSearch={handleSearch}
-              onClear={() => handleSearch('')}
-              className="max-w-xs"
-            />
+            <div className="max-w-xs w-full">
+              <SearchBar
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={handleSearch}
+              />
+            </div>
             
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
               <SelectTrigger className="w-[160px]">

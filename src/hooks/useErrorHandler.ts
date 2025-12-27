@@ -4,7 +4,10 @@ import { toast } from '@/hooks/use-toast';
 export function useErrorHandler() {
   const [isLoading, setIsLoading] = useState(false);
 
-  const executeAsync = async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
+  const executeAsync = async <T,>(
+    fn: () => Promise<T>,
+    options?: { errorMessage?: string }
+  ): Promise<T | undefined> => {
     setIsLoading(true);
     try {
       const result = await fn();
@@ -13,7 +16,7 @@ export function useErrorHandler() {
       console.error('Error:', error);
       toast({
         title: 'Error',
-        description: error.message || 'An unexpected error occurred',
+        description: options?.errorMessage || error.message || 'An unexpected error occurred',
         variant: 'destructive',
       });
       return undefined;

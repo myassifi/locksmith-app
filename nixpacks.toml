@@ -2,10 +2,10 @@
 nixPkgs = ['nodejs_20']
 
 [phases.install]
-cmds = ['npm ci']
+cmds = ['npm ci', 'npm --prefix server ci']
 
 [phases.build]
-cmds = ['npm run build']
+cmds = ['npm run build', 'npm --prefix server run railway:build']
 
 [start]
-cmd = 'npm run preview -- --host 0.0.0.0 --port $PORT'
+cmd = 'npm --prefix server run railway:start'

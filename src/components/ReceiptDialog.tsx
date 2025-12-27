@@ -11,19 +11,30 @@ import { format } from 'date-fns';
 
 interface Job {
   id: string;
-  customer: {
+  customer?: {
     name: string;
     phone?: string;
     email?: string;
     address?: string;
   };
-  serviceType: string;
+  customers?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
+  serviceType?: string;
+  job_type?: string;
   description?: string;
+  notes?: string;
   price: number;
   materialCost?: number;
-  status: string;
-  createdAt: string;
+  material_cost?: number;
+  status?: string;
+  createdAt?: string;
+  created_at?: string;
   completedAt?: string;
+  completed_at?: string;
 }
 
 interface ReceiptDialogProps {
@@ -33,14 +44,22 @@ interface ReceiptDialogProps {
 }
 
 export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProps) {
+  const customer = jobData.customer || jobData.customers || { name: 'Customer' };
+  const serviceType = jobData.serviceType || jobData.job_type || 'Service';
+  const createdAt = jobData.createdAt || jobData.created_at || new Date().toISOString();
+  const completedAt = jobData.completedAt || jobData.completed_at;
+  const materialCost = jobData.materialCost ?? jobData.material_cost;
+  const description = jobData.description || jobData.notes;
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleEmail = () => {
-    const subject = `Receipt for ${jobData.serviceType} - Heat Wave Locksmith`;
-    const body = `Receipt for job #${jobData.id}\nCustomer: ${jobData.customer.name}\nService: ${jobData.serviceType}\nTotal: ${formatCurrency(jobData.price)}`;
-    window.location.href = `mailto:${jobData.customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    if (!customer.email) return;
+    const subject = `Receipt for ${serviceType} - Heat Wave Locksmith`;
+    const body = `Receipt for job #${jobData.id}\nCustomer: ${customer.name}\nService: ${serviceType}\nTotal: ${formatCurrency(jobData.price)}`;
+    window.location.href = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -59,17 +78,17 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <h3 className="font-semibold mb-2">Bill To:</h3>
-              <p>{jobData.customer.name}</p>
-              {jobData.customer.phone && <p>{jobData.customer.phone}</p>}
-              {jobData.customer.email && <p>{jobData.customer.email}</p>}
-              {jobData.customer.address && <p className="text-gray-600">{jobData.customer.address}</p>}
+              <p>{customer.name}</p>
+              {customer.phone && <p>{customer.phone}</p>}
+              {customer.email && <p>{customer.email}</p>}
+              {customer.address && <p className="text-gray-600">{customer.address}</p>}
             </div>
             <div className="text-right">
               <h3 className="font-semibold mb-2">Receipt Details:</h3>
               <p>Job ID: #{jobData.id.slice(0, 8)}</p>
-              <p>Date: {format(new Date(jobData.createdAt), 'MMM dd, yyyy')}</p>
-              {jobData.completedAt && (
-                <p>Completed: {format(new Date(jobData.completedAt), 'MMM dd, yyyy')}</p>
+              <p>Date: {format(new Date(createdAt), 'MMM dd, yyyy')}</p>
+              {completedAt && (
+                <p>Completed: {format(new Date(completedAt), 'MMM dd, yyyy')}</p>
               )}
             </div>
           </div>
@@ -85,15 +104,15 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
               </thead>
               <tbody>
                 <tr>
-                  <td className="py-2">{jobData.serviceType}</td>
-                  <td className="py-2 text-gray-600">{jobData.description || '-'}</td>
+                  <td className="py-2">{serviceType}</td>
+                  <td className="py-2 text-gray-600">{description || '-'}</td>
                   <td className="text-right py-2">{formatCurrency(jobData.price)}</td>
                 </tr>
-                {jobData.materialCost && jobData.materialCost > 0 && (
+                {materialCost && materialCost > 0 && (
                   <tr className="text-gray-600">
                     <td className="py-2">Materials</td>
                     <td className="py-2">Parts and supplies</td>
-                    <td className="text-right py-2">{formatCurrency(jobData.materialCost)}</td>
+                    <td className="text-right py-2">{formatCurrency(materialCost)}</td>
                   </tr>
                 )}
               </tbody>
@@ -116,7 +135,7 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
-          {jobData.customer.email && (
+          {customer.email && (
             <Button onClick={handleEmail} variant="outline" className="flex-1">
               <Mail className="h-4 w-4 mr-2" />
               Email
