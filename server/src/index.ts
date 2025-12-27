@@ -314,6 +314,7 @@ app.get('/api/customers', authMiddleware, async (req: AuthRequest, res) => {
     });
     res.json(customers);
   } catch (error) {
+    console.error('Fetch customers error:', error);
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
 });
@@ -326,6 +327,7 @@ app.post('/api/customers', authMiddleware, async (req: AuthRequest, res) => {
     emitChange('customers:changed');
     res.json(customer);
   } catch (error) {
+    console.error('Create customer error:', error);
     res.status(500).json({ error: 'Failed to create customer' });
   }
 });
@@ -339,6 +341,7 @@ app.put('/api/customers/:id', authMiddleware, async (req: AuthRequest, res) => {
     emitChange('customers:changed');
     res.json(customer);
   } catch (error) {
+    console.error('Update customer error:', error);
     res.status(500).json({ error: 'Failed to update customer' });
   }
 });
@@ -349,6 +352,7 @@ app.delete('/api/customers/:id', authMiddleware, async (req: AuthRequest, res) =
     emitChange('customers:changed');
     res.json({ success: true });
   } catch (error) {
+    console.error('Delete customer error:', error);
     res.status(500).json({ error: 'Failed to delete customer' });
   }
 });

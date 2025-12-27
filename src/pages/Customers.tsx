@@ -237,10 +237,13 @@ export default function Customers() {
       setDialogOpen(false);
       resetForm();
     } catch (error) {
-      console.error('Error saving customer:', error);
+      const message = error instanceof Error ? error.message : 'Failed to save customer';
+      const status = typeof (error as any)?.status === 'number' ? (error as any).status : null;
+
+      console.error('Error saving customer:', { error, status, message });
       toast({
         title: "Error",
-        description: "Failed to save customer",
+        description: status ? `${message} (HTTP ${status})` : message,
         variant: "destructive",
       });
     }
