@@ -2,6 +2,8 @@ const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'ht
 
 type AnyRecord = Record<string, any>;
 
+export const AUTH_TOKEN_EVENT = 'auth_token_changed';
+
 function mapInventoryToApi(data: AnyRecord): AnyRecord {
   const mapped: AnyRecord = { ...data };
 
@@ -60,11 +62,16 @@ class ApiClient {
   }
 
   setToken(token: string | null) {
+    const prevToken = this.token;
     this.token = token;
     if (token) {
       localStorage.setItem('auth_token', token);
     } else {
       localStorage.removeItem('auth_token');
+    }
+
+    if (prevToken !== token && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT, { detail: { token } }));
     }
   }
 

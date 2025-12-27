@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { api } from '@/integrations/api/client';
+import { api, AUTH_TOKEN_EVENT } from '@/integrations/api/client';
 
 export interface AuthUser {
   id: string;
@@ -23,6 +23,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handler = async (event: Event) => {
+      const token = (event as CustomEvent<{ token: string | null }>).detail?.token;
+
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const me = await api.getMe();
+        setUser({
+          id: me.id,
+          email: me.email,
+          businessName: me.businessName,
+          phone: me.phone,
+          address: me.address,
+          createdAt: me.createdAt,
+        });
+      } catch {
+        api.logout();
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener(AUTH_TOKEN_EVENT, handler as EventListener);
+    return () => window.removeEventListener(AUTH_TOKEN_EVENT, handler as EventListener);
+  }, []);
 
   // On mount, try to load user from existing token
   useEffect(() => {
