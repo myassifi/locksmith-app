@@ -28,6 +28,7 @@ interface Job {
   job_type: string;
   vehicle_lock_details?: string;
   price: number;
+  miles?: number;
   material_cost?: number;
   profit_margin?: number;
   total_cost?: number;
@@ -103,6 +104,7 @@ export default function Jobs() {
     vehicle_lock_details: '',
     vehicle_year: '',
     price: '',
+    miles: '',
     job_date: format(new Date(), 'yyyy-MM-dd'),
     status: 'pending',
     notes: ''
@@ -146,6 +148,7 @@ export default function Jobs() {
         job_type: job.jobType,
         vehicle_lock_details: job.vehicleDetails || '',
         price: job.price ?? 0,
+        miles: job.miles ?? 0,
         material_cost: job.materialCost ?? 0,
         profit_margin: undefined,
         total_cost: undefined,
@@ -212,6 +215,7 @@ export default function Jobs() {
         vehicleDetails: formData.vehicle_lock_details || null,
         vehicleYear: formData.vehicle_year || null,
         price: formData.price ? parseFloat(formData.price) : 0,
+        miles: formData.miles ? parseFloat(formData.miles) : 0,
         status: formData.status as any,
         jobDate: formData.job_date,
         notes: formData.notes || '',
@@ -258,6 +262,7 @@ export default function Jobs() {
       vehicle_lock_details: job.vehicle_lock_details || '',
       vehicle_year: (job as any).vehicle_year || '',
       price: job.price ? job.price.toString() : '',
+      miles: job.miles ? job.miles.toString() : '',
       job_date: job.job_date,
       status: job.status,
       notes: job.notes || ''
@@ -299,6 +304,7 @@ export default function Jobs() {
       vehicle_lock_details: '',
       vehicle_year: '',
       price: '',
+      miles: '',
       job_date: format(new Date(), 'yyyy-MM-dd'),
       status: 'pending',
       notes: ''
@@ -613,6 +619,19 @@ export default function Jobs() {
                 </div>
 
                 <div>
+                  <Label htmlFor="miles">Miles</Label>
+                  <Input
+                    id="miles"
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={formData.miles}
+                    onChange={(e) => setFormData({ ...formData, miles: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
@@ -923,6 +942,12 @@ export default function Jobs() {
                       <Calendar className="h-4 w-4" />
                       {format(new Date(job.job_date), 'MMM dd, yyyy')}
                     </div>
+                    {!!job.miles && job.miles > 0 && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Navigation className="h-4 w-4" />
+                        {Number(job.miles).toFixed(1)} mi
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">

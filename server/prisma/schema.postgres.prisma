@@ -52,6 +52,7 @@ model Job {
   status         String   @default("pending")
   price          Float    @default(0)
   materialCost   Float    @default(0)
+  miles          Float    @default(0)
   jobDate        DateTime @default(now())
   notes          String?
   createdAt      DateTime @default(now())
