@@ -10,7 +10,7 @@
     "build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
     "start": "prisma db push --schema prisma/schema.postgres.prisma && node dist/index.js",
     "railway:build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
-    "railway:start": "prisma db push --schema prisma/schema.postgres.prisma && node dist/index.js",
+    "railway:start": "(prisma migrate deploy --schema prisma/schema.postgres.prisma || prisma db push --schema prisma/schema.postgres.prisma) && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
