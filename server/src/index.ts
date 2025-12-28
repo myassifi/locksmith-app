@@ -13,6 +13,8 @@ const prisma = new PrismaClient();
 const app = express();
 const server = http.createServer(app);
 
+app.set('trust proxy', true);
+
 // Configure multer for file uploads
 const uploadDir = path.join(__dirname, '..', 'uploads');
 const storage = multer.diskStorage({
@@ -140,8 +142,7 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req: AuthReques
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.json({ url: fileUrl });
+  res.json({ url: `/uploads/${req.file.filename}` });
 });
 
 // ============ AUTH ============

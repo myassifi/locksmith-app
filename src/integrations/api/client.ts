@@ -4,6 +4,24 @@ type AnyRecord = Record<string, any>;
 
 export const AUTH_TOKEN_EVENT = 'auth_token_changed';
 
+function resolveImageUrl(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== 'string') return undefined;
+  const url = raw.trim();
+  if (!url) return undefined;
+
+  // If the API returns a relative upload path, resolve it against API_URL in dev.
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+
+  // Avoid mixed-content (http image on https page).
+  if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && url.startsWith('http://')) {
+    return `https://${url.slice('http://'.length)}`;
+  }
+
+  return url;
+}
+
 function mapInventoryToApi(data: AnyRecord): AnyRecord {
   const mapped: AnyRecord = { ...data };
 
@@ -49,7 +67,7 @@ function mapInventoryFromApi(item: AnyRecord): AnyRecord {
     low_stock_threshold: item.lowStockThreshold ?? item.low_stock_threshold,
     year_from: item.yearFrom ?? item.year_from,
     year_to: item.yearTo ?? item.year_to,
-    image_url: item.imageUrl ?? item.image_url,
+    image_url: resolveImageUrl(item.imageUrl ?? item.image_url),
     created_at: item.createdAt ?? item.created_at,
   };
 }
