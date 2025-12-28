@@ -1106,22 +1106,22 @@ export default function InventoryNew() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="w-full justify-start overflow-x-auto grid grid-cols-5">
-              <TabsTrigger value="all" className="gap-2 touch-target">
-                All <Badge variant="secondary" className="ml-1">{stats.all}</Badge>
+            <TabsList className="w-full justify-start gap-2">
+              <TabsTrigger value="all" className="gap-2 whitespace-nowrap shrink-0">
+                All <Badge variant="secondary" className="ml-1 shrink-0">{stats.all}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="reorder" className="gap-2 touch-target">
+              <TabsTrigger value="reorder" className="gap-2 whitespace-nowrap shrink-0">
                 <ShoppingCart className="h-3 w-3" />
-                Reorder <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-400">{stats.reorder}</Badge>
+                Reorder <Badge variant="secondary" className="ml-1 shrink-0 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-400">{stats.reorder}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="low" className="gap-2 touch-target">
-                Low <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">{stats.low}</Badge>
+              <TabsTrigger value="low" className="gap-2 whitespace-nowrap shrink-0">
+                Low <Badge variant="secondary" className="ml-1 shrink-0 bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">{stats.low}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="out" className="gap-2 touch-target">
-                Out <Badge variant="destructive" className="ml-1">{stats.out}</Badge>
+              <TabsTrigger value="out" className="gap-2 whitespace-nowrap shrink-0">
+                Out <Badge variant="destructive" className="ml-1 shrink-0">{stats.out}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="in-stock" className="gap-2 touch-target">
-                In Stock <Badge variant="secondary" className="ml-1">{stats.inStock}</Badge>
+              <TabsTrigger value="in-stock" className="gap-2 whitespace-nowrap shrink-0">
+                In Stock <Badge variant="secondary" className="ml-1 shrink-0">{stats.inStock}</Badge>
               </TabsTrigger>
             </TabsList>
           </Tabs>

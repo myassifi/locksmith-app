@@ -778,7 +778,7 @@ export default function Jobs() {
               onClick={() => {
                 setSearchParams(new URLSearchParams());
               }}
-              className="h-7 text-xs"
+              className="h-11 sm:h-7 text-sm sm:text-xs"
             >
               Clear Filters
             </Button>
@@ -800,52 +800,57 @@ export default function Jobs() {
           filteredJobs.map((job) => (
             <Card key={job.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {job.customers?.name}
-                      {job.customers?.phone && (
-                        <>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-lg truncate">{job.customers?.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{formatJobType(job.job_type)}</p>
+                        {job.customers?.address && (
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {job.customers.address}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {job.customers?.phone && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSMSCustomer(job.customers.phone!, job.customers.name, formatJobType(job.job_type))}
+                              className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
+                              title="Send SMS"
+                            >
+                              <MessageSquare className="h-4 w-4 sm:h-3 sm:w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCallCustomer(job.customers.phone!)}
+                              className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
+                              title="Call"
+                            >
+                              <Phone className="h-4 w-4 sm:h-3 sm:w-3" />
+                            </Button>
+                          </>
+                        )}
+                        {job.customers?.address && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleSMSCustomer(job.customers.phone!, job.customers.name, formatJobType(job.job_type))}
+                            onClick={() => handleGetDirections(job.customers.address!, job.customers.name)}
                             className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
-                            title="Send SMS"
+                            title="Directions"
                           >
-                            <MessageSquare className="h-4 w-4 sm:h-3 sm:w-3" />
+                            <MapPin className="h-4 w-4 sm:h-3 sm:w-3" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCallCustomer(job.customers.phone!)}
-                            className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
-                            title="Call"
-                          >
-                            <Phone className="h-4 w-4 sm:h-3 sm:w-3" />
-                          </Button>
-                        </>
-                      )}
-                      {job.customers?.address && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleGetDirections(job.customers.address!, job.customers.name)}
-                          className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
-                        >
-                          <MapPin className="h-4 w-4 sm:h-3 sm:w-3" />
-                        </Button>
-                      )}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">{formatJobType(job.job_type)}</p>
-                    {job.customers?.address && (
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {job.customers.address}
-                      </p>
-                    )}
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
                     <Badge variant="outline" className={getStatusColor(job.status)}>
                       {getStatusIcon(job.status)} {job.status.replace(/_/g, ' ')}
                     </Badge>
@@ -871,7 +876,7 @@ export default function Jobs() {
                             });
                           }
                         }}
-                        className="h-10 sm:h-7 px-3 sm:px-2 text-sm sm:text-xs bg-green-500 hover:bg-green-600 text-white"
+                        className="h-11 sm:h-7 px-3 sm:px-2 text-sm sm:text-xs bg-green-500 hover:bg-green-600 text-white"
                       >
                         Mark Completed
                       </Button>
@@ -883,7 +888,7 @@ export default function Jobs() {
                           setSelectedJobForReceipt(job);
                           setReceiptDialogOpen(true);
                         }}
-                        className="h-10 sm:h-8 text-sm sm:text-xs gap-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                        className="h-11 sm:h-8 text-sm sm:text-xs gap-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
                         title="Send Receipt"
                       >
                         📧 <span className="hidden sm:inline">Receipt</span>
