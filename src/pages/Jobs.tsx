@@ -338,14 +338,16 @@ export default function Jobs() {
 
   const handleCallCustomer = (phone: string) => {
     if (phone) {
-      window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+      const normalized = phone.replace(/[^\d+]/g, '');
+      window.location.href = `tel:${normalized}`;
     }
   };
 
   const handleSMSCustomer = (phone: string, customerName: string, jobType: string) => {
     if (phone) {
       const message = `Hi ${customerName}, this is regarding your ${jobType} service. `;
-      window.location.href = `sms:${phone.replace(/\s+/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(message)}`;
+      const normalized = phone.replace(/[^\d+]/g, '');
+      window.location.href = `sms:${normalized}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(message)}`;
     }
   };
 
@@ -808,19 +810,19 @@ export default function Jobs() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleSMSCustomer(job.customers.phone!, job.customers.name, formatJobType(job.job_type))}
-                            className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                            className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
                             title="Send SMS"
                           >
-                            <MessageSquare className="h-3 w-3" />
+                            <MessageSquare className="h-4 w-4 sm:h-3 sm:w-3" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleCallCustomer(job.customers.phone!)}
-                            className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                            className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
                             title="Call"
                           >
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-4 w-4 sm:h-3 sm:w-3" />
                           </Button>
                         </>
                       )}
@@ -829,9 +831,9 @@ export default function Jobs() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleGetDirections(job.customers.address!, job.customers.name)}
-                          className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                          className="h-11 w-11 sm:h-6 sm:w-6 p-0 text-primary hover:bg-primary/10"
                         >
-                          <MapPin className="h-3 w-3" />
+                          <MapPin className="h-4 w-4 sm:h-3 sm:w-3" />
                         </Button>
                       )}
                     </CardTitle>
@@ -869,7 +871,7 @@ export default function Jobs() {
                             });
                           }
                         }}
-                        className="h-7 px-2 text-xs bg-green-500 hover:bg-green-600 text-white"
+                        className="h-10 sm:h-7 px-3 sm:px-2 text-sm sm:text-xs bg-green-500 hover:bg-green-600 text-white"
                       >
                         Mark Completed
                       </Button>
@@ -881,7 +883,7 @@ export default function Jobs() {
                           setSelectedJobForReceipt(job);
                           setReceiptDialogOpen(true);
                         }}
-                        className="h-8 text-xs gap-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                        className="h-10 sm:h-8 text-sm sm:text-xs gap-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
                         title="Send Receipt"
                       >
                         📧 <span className="hidden sm:inline">Receipt</span>
@@ -891,6 +893,7 @@ export default function Jobs() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEdit(job)}
+                      className="h-11 w-11 sm:h-9 sm:w-9 p-0"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -898,7 +901,7 @@ export default function Jobs() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(job.id)}
-                      className="text-destructive hover:text-destructive"
+                      className="h-11 w-11 sm:h-9 sm:w-9 p-0 text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
