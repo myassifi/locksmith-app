@@ -48,7 +48,6 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
   const serviceType = jobData.serviceType || jobData.job_type || 'Service';
   const createdAt = jobData.createdAt || jobData.created_at || new Date().toISOString();
   const completedAt = jobData.completedAt || jobData.completed_at;
-  const materialCost = jobData.materialCost ?? jobData.material_cost;
   const description = jobData.description || jobData.notes;
 
   const getReceiptText = () => {
@@ -56,7 +55,7 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
     lines.push('Heat Wave Locksmith');
     lines.push('Receipt');
     lines.push('');
-    lines.push(`Job ID: #${jobData.id.slice(0, 8)}`);
+    lines.push(`Receipt #: HW-${jobData.id.slice(0, 8).toUpperCase()}`);
     lines.push(`Date: ${format(new Date(createdAt), 'MMM dd, yyyy')}`);
     if (completedAt) {
       lines.push(`Completed: ${format(new Date(completedAt), 'MMM dd, yyyy')}`);
@@ -69,9 +68,6 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
     lines.push('');
     lines.push(`Service: ${serviceType}`);
     if (description) lines.push(`Description: ${description}`);
-    if (materialCost && materialCost > 0) {
-      lines.push(`Materials: ${formatCurrency(materialCost)}`);
-    }
     lines.push(`Total: ${formatCurrency(jobData.price)}`);
     lines.push('');
     lines.push('Thank you for your business!');
@@ -150,7 +146,7 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
             </div>
             <div className="text-right">
               <h3 className="font-semibold mb-2">Receipt Details:</h3>
-              <p>Job ID: #{jobData.id.slice(0, 8)}</p>
+              <p>Receipt #: HW-{jobData.id.slice(0, 8).toUpperCase()}</p>
               <p>Date: {format(new Date(createdAt), 'MMM dd, yyyy')}</p>
               {completedAt && (
                 <p>Completed: {format(new Date(completedAt), 'MMM dd, yyyy')}</p>
@@ -162,24 +158,18 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2">Service</th>
                   <th className="text-left py-2">Description</th>
                   <th className="text-right py-2">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="py-2">{serviceType}</td>
-                  <td className="py-2 text-gray-600">{description || '-'}</td>
+                  <td className="py-2">
+                    <div className="font-medium">{serviceType}</div>
+                    <div className="text-gray-600">{description || '-'}</div>
+                  </td>
                   <td className="text-right py-2">{formatCurrency(jobData.price)}</td>
                 </tr>
-                {materialCost && materialCost > 0 && (
-                  <tr className="text-gray-600">
-                    <td className="py-2">Materials</td>
-                    <td className="py-2">Parts and supplies</td>
-                    <td className="text-right py-2">{formatCurrency(materialCost)}</td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
