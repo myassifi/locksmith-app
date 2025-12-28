@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer, Mail } from 'lucide-react';
+import { Printer, Mail, MessageSquare, Copy, Share2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { format } from 'date-fns';
 
@@ -51,6 +51,35 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
   const materialCost = jobData.materialCost ?? jobData.material_cost;
   const description = jobData.description || jobData.notes;
 
+  const getReceiptText = () => {
+    const lines: string[] = [];
+    lines.push('Heat Wave Locksmith');
+    lines.push('Receipt');
+    lines.push('');
+    lines.push(`Job ID: #${jobData.id.slice(0, 8)}`);
+    lines.push(`Date: ${format(new Date(createdAt), 'MMM dd, yyyy')}`);
+    if (completedAt) {
+      lines.push(`Completed: ${format(new Date(completedAt), 'MMM dd, yyyy')}`);
+    }
+    lines.push('');
+    lines.push(`Customer: ${customer.name}`);
+    if (customer.phone) lines.push(`Phone: ${customer.phone}`);
+    if (customer.email) lines.push(`Email: ${customer.email}`);
+    if (customer.address) lines.push(`Address: ${customer.address}`);
+    lines.push('');
+    lines.push(`Service: ${serviceType}`);
+    if (description) lines.push(`Description: ${description}`);
+    if (materialCost && materialCost > 0) {
+      lines.push(`Materials: ${formatCurrency(materialCost)}`);
+    }
+    lines.push(`Total: ${formatCurrency(jobData.price)}`);
+    lines.push('');
+    lines.push('Thank you for your business!');
+    return lines.join('\n');
+  };
+
+  const normalizePhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+
   const handlePrint = () => {
     window.print();
   };
@@ -58,8 +87,44 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
   const handleEmail = () => {
     if (!customer.email) return;
     const subject = `Receipt for ${serviceType} - Heat Wave Locksmith`;
-    const body = `Receipt for job #${jobData.id}\nCustomer: ${customer.name}\nService: ${serviceType}\nTotal: ${formatCurrency(jobData.price)}`;
+    const body = getReceiptText();
     window.location.href = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSMS = () => {
+    if (!customer.phone) return;
+    const body = getReceiptText();
+    const normalized = normalizePhone(customer.phone);
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    window.location.href = `sms:${normalized}${isIOS ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
+
+  const handleCopy = async () => {
+    const text = getReceiptText();
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  };
+
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const handleShare = async () => {
+    if (!canShare) return;
+    await navigator.share({
+      title: 'Receipt',
+      text: getReceiptText(),
+    });
   };
 
   return (
@@ -130,11 +195,27 @@ export function ReceiptDialog({ open, onOpenChange, jobData }: ReceiptDialogProp
           </div>
         </div>
 
-        <div className="flex gap-2 print:hidden">
-          <Button onClick={handlePrint} className="flex-1">
+        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 print:hidden">
+          <Button onClick={handlePrint} className="col-span-2 sm:flex-1">
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
+          <Button onClick={handleCopy} variant="outline" className="flex-1">
+            <Copy className="h-4 w-4 mr-2" />
+            Copy
+          </Button>
+          {canShare && (
+            <Button onClick={handleShare} variant="outline" className="flex-1">
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          )}
+          {customer.phone && (
+            <Button onClick={handleSMS} variant="outline" className="flex-1">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Text
+            </Button>
+          )}
           {customer.email && (
             <Button onClick={handleEmail} variant="outline" className="flex-1">
               <Mail className="h-4 w-4 mr-2" />
