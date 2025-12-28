@@ -28,6 +28,7 @@ interface Customer {
   total_jobs?: number;
   total_revenue?: number;
   last_job_date?: string;
+  next_follow_up_at?: string | null;
 }
 
 export default function Customers() {
@@ -103,6 +104,7 @@ export default function Customers() {
           email: customer.email,
           address: customer.address,
           notes: customer.notes,
+          next_follow_up_at: customer.nextFollowUpAt ?? null,
           created_at: customer.createdAt,
           total_jobs: totalJobs,
           total_revenue: totalRevenue,
@@ -286,6 +288,64 @@ export default function Customers() {
   const resetForm = () => {
     setFormData({ name: '', phone: '', email: '', address: '', notes: '' });
     setEditingCustomer(null);
+  };
+
+  const normalizePhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+  const openSMS = (phone: string, body: string) => {
+    const normalized = normalizePhone(phone);
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    window.location.href = `sms:${normalized}${isIOS ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
+
+  const handleRequestReview = (customer: Customer) => {
+    if (!customer.phone) return;
+    const reviewUrl = (import.meta.env.VITE_GOOGLE_REVIEW_URL || '').trim();
+    const message = reviewUrl
+      ? `Hi ${customer.name}! Thanks for choosing Heat Wave Locksmith. If you were happy with the service, could you leave a quick review here? ${reviewUrl}`
+      : `Hi ${customer.name}! Thanks for choosing Heat Wave Locksmith. If you were happy with the service, could you leave us a quick review? Reply here and I’ll send you the link.`;
+    openSMS(customer.phone, message);
+  };
+
+  const setFollowUp = async (customer: Customer, daysFromNow: number) => {
+    const next = new Date();
+    next.setDate(next.getDate() + daysFromNow);
+    try {
+      await api.updateCustomer(customer.id, {
+        nextFollowUpAt: next.toISOString(),
+      });
+      toast({
+        title: 'Follow-up scheduled',
+        description: `${customer.name} on ${format(next, 'MMM dd, yyyy')}`,
+      });
+      loadCustomers();
+    } catch (error) {
+      console.error('Error updating follow-up date:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to schedule follow-up',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const clearFollowUp = async (customer: Customer) => {
+    try {
+      await api.updateCustomer(customer.id, {
+        nextFollowUpAt: null,
+      });
+      toast({
+        title: 'Follow-up cleared',
+        description: customer.name,
+      });
+      loadCustomers();
+    } catch (error) {
+      console.error('Error clearing follow-up date:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear follow-up',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Remove duplicate filteredCustomers as it's handled by handleSearch
@@ -548,7 +608,20 @@ export default function Customers() {
             </CardContent>
           </Card>
         ) : (
-          filteredCustomers.map((customer, index) => (
+          filteredCustomers.map((customer, index) => {
+            const followUpDate = customer.next_follow_up_at ? new Date(customer.next_follow_up_at) : null;
+            const now = new Date();
+            const isDue = !!followUpDate && followUpDate.getTime() <= now.getTime();
+            const soonThreshold = new Date(now);
+            soonThreshold.setDate(soonThreshold.getDate() + 7);
+            const isSoon = !!followUpDate && !isDue && followUpDate.getTime() <= soonThreshold.getTime();
+            const followUpBadgeClass = isDue
+              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+              : isSoon
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'
+                : 'bg-primary/10 text-primary dark:bg-primary/20';
+
+            return (
             <Card key={customer.id} className={`hover-lift glass-card fade-in`} style={{animationDelay: `${index * 100}ms`}}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -608,6 +681,17 @@ export default function Customers() {
                       <PhoneCall className="h-3 w-3" />
                     </Button>
                   )}
+                  {customer.phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRequestReview(customer)}
+                      className="gap-1"
+                      title="Request Review"
+                    >
+                      <Star className="h-3 w-3" />
+                    </Button>
+                  )}
                   {customer.email && (
                     <Button
                       size="sm"
@@ -630,6 +714,36 @@ export default function Customers() {
                       <Navigation className="h-3 w-3" />
                     </Button>
                   )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4 rounded-lg border bg-muted/10 p-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Follow-up</span>
+                    {followUpDate ? (
+                      <Badge variant="secondary" className={followUpBadgeClass}>
+                        {isDue ? 'Due' : 'Next'}: {format(followUpDate, 'MMM dd')}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not set</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" onClick={() => setFollowUp(customer, 30)} className="px-2">
+                      +30d
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setFollowUp(customer, 90)} className="px-2">
+                      +90d
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setFollowUp(customer, 180)} className="px-2">
+                      +180d
+                    </Button>
+                    {followUpDate && (
+                      <Button size="sm" variant="outline" onClick={() => clearFollowUp(customer)} className="px-2">
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Business Intelligence Stats */}
@@ -725,7 +839,8 @@ export default function Customers() {
                 </div>
               </CardContent>
             </Card>
-          ))
+          );
+          })
         )}
       </div>
 

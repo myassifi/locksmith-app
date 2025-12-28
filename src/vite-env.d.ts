@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly PROD: boolean;
   readonly SSR: boolean;
   readonly VITE_API_URL?: string;
+  readonly VITE_GOOGLE_REVIEW_URL?: string;
 }
 
 interface ImportMeta {
