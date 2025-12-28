@@ -86,7 +86,7 @@ export function Layout({ children }: LayoutProps) {
           </header>
 
           {/* Main content with improved mobile layout */}
-          <main className="flex-1 mobile-container py-4 sm:py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 smooth-scroll overflow-auto relative">
+          <main className="flex-1 mobile-container py-4 sm:py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 smooth-scroll overflow-y-auto overflow-x-hidden relative">
             <div className="max-w-7xl mx-auto">
               {children}
             </div>

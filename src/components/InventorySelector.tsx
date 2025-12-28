@@ -261,18 +261,18 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
                         variant="outline"
                         size="sm"
                         onClick={() => updateQuantity(item.inventory_id, item.quantity_used - 1)}
-                        className="h-8 w-8 p-0"
+                        className="h-11 w-11 sm:h-8 sm:w-8 p-0"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-4 w-4 sm:h-3 sm:w-3" />
                       </Button>
                       <span className="w-8 text-center font-medium">{item.quantity_used}</span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => updateQuantity(item.inventory_id, item.quantity_used + 1)}
-                        className="h-8 w-8 p-0"
+                        className="h-11 w-11 sm:h-8 sm:w-8 p-0"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-4 w-4 sm:h-3 sm:w-3" />
                       </Button>
                     </div>
                     
@@ -287,7 +287,7 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
                       variant="ghost"
                       size="sm"
                       onClick={() => removeItem(item.inventory_id)}
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      className="h-11 w-11 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </Button>

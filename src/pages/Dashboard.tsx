@@ -547,7 +547,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Overview of your business performance</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <Input
             placeholder="Quick search jobs (press Enter)"
             className="w-[220px] hidden md:block"
@@ -576,7 +576,7 @@ export default function Dashboard() {
             size="sm" 
             onClick={exportToCSV}
             disabled={data.jobs.total === 0}
-            className="gap-1 h-9"
+            className="gap-1"
           >
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
@@ -585,7 +585,7 @@ export default function Dashboard() {
             variant="outline" 
             size="sm" 
             onClick={() => refetch()} 
-            className="h-9 px-3"
+            className="px-3"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
@@ -597,15 +597,15 @@ export default function Dashboard() {
       <div>
         <h2 className="text-lg font-semibold mb-3 px-1">Quick Actions</h2>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate('/jobs?new=true')} className="gap-2 h-9">
+          <Button onClick={() => navigate('/jobs?new=true')} className="gap-2">
             <Plus className="h-4 w-4" />
             Create Job
           </Button>
-          <Button variant="outline" onClick={() => navigate('/inventory')} className="gap-2 h-9">
+          <Button variant="outline" onClick={() => navigate('/inventory')} className="gap-2">
             <Package className="h-4 w-4" />
             Add Inventory
           </Button>
-          <Button variant="outline" onClick={() => navigate('/customers')} className="gap-2 h-9">
+          <Button variant="outline" onClick={() => navigate('/customers')} className="gap-2">
             <Users className="h-4 w-4" />
             View Customers
           </Button>

@@ -971,7 +971,7 @@ export default function InventoryNew() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowLowStockAlert(false)}
-                    className="h-8 w-8 p-0"
+                    className="h-11 w-11 sm:h-8 sm:w-8 p-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -999,7 +999,7 @@ export default function InventoryNew() {
                   // Delay to allow click on suggestion
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
-                className="pl-10 h-9 touch-target"
+                className="pl-10"
               />
               
               {/* Search Suggestions Dropdown */}
@@ -1035,7 +1035,7 @@ export default function InventoryNew() {
             </div>
 
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-              <SelectTrigger className="w-[150px] sm:w-[180px] h-9">
+              <SelectTrigger className="w-[150px] sm:w-[180px]">
                 <ArrowUpDown className="h-4 w-4 mr-1" />
                 <SelectValue />
               </SelectTrigger>

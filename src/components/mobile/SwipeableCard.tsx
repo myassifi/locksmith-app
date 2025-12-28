@@ -83,7 +83,7 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-background shadow-sm rounded-md"
+              className="text-muted-foreground hover:text-foreground hover:bg-background shadow-sm rounded-md"
               onClick={() => onQuantityChange(item.id, Math.max(0, item.quantity - 1))}
             >
               <Minus className="h-4 w-4" />
@@ -92,7 +92,7 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-background shadow-sm rounded-md"
+              className="text-muted-foreground hover:text-foreground hover:bg-background shadow-sm rounded-md"
               onClick={() => onQuantityChange(item.id, item.quantity + 1)}
             >
               <Plus className="h-4 w-4" />
@@ -103,7 +103,7 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 border-muted-foreground/20"
+              className="border-muted-foreground/20"
               onClick={() => onEdit(item)}
             >
               <Edit className="h-4 w-4 text-muted-foreground" />
@@ -111,7 +111,7 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+              className="hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
               onClick={() => onDelete(item.id)}
             >
               <Trash2 className="h-4 w-4" />
