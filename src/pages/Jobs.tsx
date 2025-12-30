@@ -130,11 +130,20 @@ export default function Jobs() {
 
   useEffect(() => {
     const newParam = searchParams.get('new');
-    if (newParam === 'true') {
+    if (newParam === 'true' || newParam === '1') {
+      const customerId = searchParams.get('customerId') || searchParams.get('customer');
+      resetForm();
+      if (customerId) {
+        setFormData((prev) => ({ ...prev, customer_id: customerId }));
+      }
       setDialogOpen(true);
-      // Clear the parameter after opening
-      searchParams.delete('new');
-      setSearchParams(searchParams, { replace: true });
+
+      // Clear params after opening
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('new');
+      nextParams.delete('customerId');
+      nextParams.delete('customer');
+      setSearchParams(nextParams, { replace: true });
     }
   }, [searchParams]);
 

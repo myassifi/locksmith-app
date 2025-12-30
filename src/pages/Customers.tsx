@@ -16,6 +16,7 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { format } from 'date-fns';
 import { api } from '@/integrations/api/client';
 import { useCustomersSocket } from '@/hooks/useSocket';
+import { useNavigate } from 'react-router-dom';
 
 interface Customer {
   id: string;
@@ -33,6 +34,7 @@ interface Customer {
 
 export default function Customers() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -233,6 +235,11 @@ export default function Customers() {
         const newCustomer = await api.createCustomer(formData);
 
         toast({ title: "Success", description: "Customer created successfully" });
+
+        setDialogOpen(false);
+        resetForm();
+        navigate(`/jobs?new=true&customerId=${newCustomer.id}`);
+        return;
       }
       
       loadCustomers();
@@ -664,7 +671,7 @@ export default function Customers() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => window.location.href = `/jobs/new?customer=${customer.id}`}
+                    onClick={() => navigate(`/jobs?new=true&customerId=${customer.id}`)}
                     className="flex-1 min-w-[120px] gap-1"
                   >
                     <Plus className="h-3 w-3" />

@@ -1004,7 +1004,7 @@ export default function Dashboard() {
                     Get started by creating a job, adding inventory, or adding a customer.
                   </p>
                   <div className="flex gap-2">
-                    <Button onClick={() => navigate('/jobs/new')} size="sm">
+                    <Button onClick={() => navigate('/jobs?new=true')} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Job
                     </Button>
