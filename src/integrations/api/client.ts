@@ -190,6 +190,29 @@ class ApiClient {
     });
   }
 
+  // Invoice
+  async importInvoice(file: File) {
+    const formData = new FormData();
+    formData.append('invoice', file);
+    return this.request<{
+      success: boolean;
+      supplier: string;
+      items: any[];
+      totalItems: number;
+      totalValue: number;
+    }>('/api/invoice/import-invoice', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async bulkAddInvoiceItems(items: any[]) {
+    return this.request<{ success: boolean; message: string; results: any[] }>('/api/invoice/bulk-add', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
   // Inventory
   async getInventory() {
     const items = await this.request<any[]>('/api/inventory');

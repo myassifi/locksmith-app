@@ -9,6 +9,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
+// Import routes
+import invoiceRoutes from './routes/invoice';
+
 const prisma = new PrismaClient();
 const app = express();
 const server = http.createServer(app);
@@ -16,7 +19,10 @@ const server = http.createServer(app);
 app.set('trust proxy', true);
 
 // Configure multer for file uploads
-const uploadDir = path.join(__dirname, '..', 'uploads');
+// Make upload path absolute and consistent in both dev and prod environments
+const isProduction = process.env.NODE_ENV === 'production';
+const rootDir = isProduction ? path.join(__dirname, '../..') : path.join(__dirname, '..');
+const uploadDir = path.join(rootDir, 'uploads');
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     if (!fs.existsSync(uploadDir)) {
@@ -87,7 +93,21 @@ app.use(
 );
 app.use(express.json());
 // Serve static files from uploads directory
-app.use('/uploads', express.static(uploadDir));
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log(`Created upload directory at ${uploadDir}`);
+} else {
+  console.log(`Upload directory exists at ${uploadDir}`);
+}
+
+// Serve static files from uploads directory with cache control
+app.use('/uploads', express.static(uploadDir, {
+  maxAge: '1d', // Cache for one day
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+}));
 
 // Socket.IO connection
 io.on('connection', (socket) => {
@@ -142,7 +162,9 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req: AuthReques
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  res.json({ url: `/uploads/${req.file.filename}` });
+  const imageUrl = `/uploads/${req.file.filename}`;
+  console.log(`File uploaded successfully: ${imageUrl}`);
+  res.json({ url: imageUrl });
 });
 
 // ============ AUTH ============
@@ -252,6 +274,9 @@ app.put('/auth/profile', authMiddleware, async (req: AuthRequest, res) => {
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
+
+// Use invoice routes
+app.use('/api/invoice', authMiddleware, invoiceRoutes);
 
 // ============ INVENTORY ============
 

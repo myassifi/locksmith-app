@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp } from 'lucide-react';
+import InvoiceUpload from '@/components/invoice/InvoiceUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -997,15 +998,7 @@ export default function InventoryNew() {
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Export</span>
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setImportDialogOpen(true)}
-                className="gap-2 touch-target"
-              >
-                <FileUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Import List</span>
-              </Button>
+              <InvoiceUpload onComplete={loadInventory} />
               <Button
                 variant="outline"
                 size="icon"
