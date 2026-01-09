@@ -145,43 +145,101 @@ router.post('/bulk-add', async (req: AuthRequest, res: Response) => {
     
     // Process each item
     const results = [];
-    const invoiceNumber = `INV-${Date.now()}`;
+
+    const existingItems = await prisma.inventoryItem.findMany({
+      where: {
+        userId: req.userId,
+        sku: { not: null }
+      },
+      select: {
+        id: true,
+        sku: true,
+        quantity: true
+      }
+    });
+
+    const existingByNormalizedSku = new Map<
+      string,
+      { id: string; sku: string | null; quantity: number }
+    >();
+
+    for (const existing of existingItems) {
+      const normalized = (existing.sku || '').trim().toUpperCase();
+      if (!normalized) continue;
+      if (!existingByNormalizedSku.has(normalized)) {
+        existingByNormalizedSku.set(normalized, {
+          id: existing.id,
+          sku: existing.sku,
+          quantity: existing.quantity
+        });
+      }
+    }
     
     for (const item of items) {
+      const rawSku = typeof item?.sku === 'string' ? item.sku : '';
+      const normalizedSku = rawSku.trim().toUpperCase();
+
+      const parsedQty =
+        typeof item?.quantity === 'number'
+          ? item.quantity
+          : parseInt(String(item?.quantity ?? '0'), 10);
+      const quantity = Number.isFinite(parsedQty) ? parsedQty : 0;
+
+      const parsedPrice =
+        typeof item?.price === 'number' ? item.price : parseFloat(String(item?.price ?? '0'));
+      const price = Number.isFinite(parsedPrice) ? parsedPrice : 0;
+
       // Check if item already exists
-      const existing = await prisma.inventoryItem.findFirst({
-        where: { 
-          userId: req.userId,
-          sku: item.sku
-        }
-      });
+      const existing = normalizedSku ? existingByNormalizedSku.get(normalizedSku) : undefined;
       
       if (existing) {
         // Update quantity
         await prisma.inventoryItem.update({
           where: { id: existing.id },
           data: {
-            quantity: existing.quantity + item.quantity,
-            updatedAt: new Date()
+            quantity: { increment: quantity },
+            updatedAt: new Date(),
+            ...(existing.sku !== normalizedSku ? { sku: normalizedSku } : {})
           }
         });
+
+        existing.quantity += quantity;
+        existing.sku = normalizedSku;
         results.push({ 
-          sku: item.sku, 
+          sku: normalizedSku, 
           action: 'updated', 
-          quantity: item.quantity,
-          newTotal: existing.quantity + item.quantity
+          quantity: quantity,
+          newTotal: existing.quantity
         });
       } else {
         // Insert new item
-        const inventoryItem = mapToInventoryItem(item, req.userId);
+        const inventoryItem = mapToInventoryItem(
+          {
+            ...item,
+            sku: normalizedSku,
+            quantity,
+            price,
+            description: typeof item?.description === 'string' ? item.description : String(item?.description ?? '')
+          },
+          req.userId
+        );
         
-        await prisma.inventoryItem.create({
-          data: inventoryItem as any
+        const created = await prisma.inventoryItem.create({
+          data: inventoryItem as any,
+          select: { id: true, sku: true, quantity: true }
         });
+
+        if (normalizedSku) {
+          existingByNormalizedSku.set(normalizedSku, {
+            id: created.id,
+            sku: created.sku,
+            quantity: created.quantity
+          });
+        }
         results.push({ 
-          sku: item.sku, 
+          sku: normalizedSku, 
           action: 'added', 
-          quantity: item.quantity 
+          quantity: quantity 
         });
       }
     }
