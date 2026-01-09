@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List } from 'lucide-react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,6 +50,86 @@ interface FilterState {
   fccId: string;
 }
 
+const PRESET_IMPORT_ITEMS: Array<{ sku: string; description: string; quantity: number }> = [
+  { sku: 'KB-UNV-TR47', description: 'Flip Remote Key Blade Toyota Style Toy43 TR47 TOYO-15', quantity: 15 },
+  { sku: 'KB-UNV-TOY41R', description: 'Flip Remote Blade For Toyota TOY41R', quantity: 11 },
+  { sku: 'AC-XHS-SUPCHIP', description: 'Xhorse VVDI Super Chip Transponder XT27A66', quantity: 10 },
+  { sku: 'KS-FRD-H92', description: 'Transponder Key Shell For Ford H72 With Chip Holder', quantity: 5 },
+  { sku: 'KS-JMA-B111', description: 'JMA Transponder Key Shell For GM with Chip Holder TP00GM-37.P', quantity: 5 },
+  { sku: 'KS-NIS-DA34', description: 'Square Head Transponder Key Shell For Nissan NSN14 With Chip Holder', quantity: 5 },
+  { sku: 'CR-XHS-XNBU01EN', description: 'Xhorse Wireless Flip Remote Key Buick Style 4 Buttons', quantity: 4 },
+  { sku: 'CR-XHS-XNHO00EN', description: 'Xhorse Wireless Flip Remote Key Honda Style 3 Buttons', quantity: 4 },
+  { sku: 'CR-AUT-IKEYTY8A4TP', description: 'Autel iKey Universal Smart Key Toyota Style 8A-chipped 4 Button', quantity: 3 },
+  { sku: 'CR-XHS-XKHO01EN', description: 'Xhorse Wire Flip Remote Honda Style 3+1 Buttons', quantity: 2 },
+  { sku: 'CR-FOB-3B', description: 'Fobik Remote Key For Chrysler Jeep Dodge VW 3 Button', quantity: 2 },
+  { sku: 'CR-AUT-CR5TPR', description: 'Autel iKey Universal Smart Key Chrysler Premium Style 5 Button', quantity: 2 },
+  { sku: 'CR-JEP-GQ4FOB3B', description: 'Fobik Remote Key for 2014-2019 Jeep Cherokee GQ4-53T', quantity: 2 },
+  { sku: 'CR-FOB-4BSED', description: 'Fobik Remote Key For Chrysler Dodge IYZ-C01C 4 Buttons', quantity: 2 },
+  { sku: 'CR-XHS-XKBU01EN', description: 'Xhorse Wire Flip Remote Key Buick Style 4 Buttons', quantity: 2 },
+  { sku: 'TK-TOY-TOY44DAF', description: 'Transponder Key For Toyota TOY44D With Aftermarket Chip 4D67', quantity: 2 },
+  { sku: 'CR-XHS-XKTO02EN', description: 'Xhorse Wire Remote Key Toyota Style Triangle 4 Buttons', quantity: 2 },
+  { sku: 'CR-XHS-XKNI00EN', description: 'Xhorse Wire Remote Nissan Style Separate 4 Buttons', quantity: 2 },
+  { sku: 'CR-XHS-XKTO12EN', description: 'Xhorse Universal Wired Flip Remote Key 2nd Gen Toyota Style', quantity: 2 },
+  { sku: 'RS-TOY-RH15M4BSED', description: 'Remote Head Key Shell For Toyota With Blade TOY43 4 Button', quantity: 2 },
+  { sku: 'CR-DOD-56046771AA', description: 'Fobik Remote Key For Dodge Dart M3N32297100 4 Button', quantity: 1 },
+  { sku: 'CR-KDY-ZB33-4', description: 'KeyDiy KD Universal Smart Remote Key 4 Button Hyundai Style', quantity: 1 },
+  { sku: 'TOOL-FLPTS', description: '6-in-1 Foldable Lock Pick Tool Set', quantity: 1 },
+];
+
+function normalizeMaybeNA(value: string | null | undefined) {
+  const v = (value ?? '').trim();
+  return v ? v : 'n/a';
+}
+
+function guessSupplierFromText(sku: string, description: string) {
+  const s = `${sku} ${description}`.toLowerCase();
+  if (s.includes('xhorse') || s.includes('xhs')) return 'Xhorse';
+  if (s.includes('autel') || s.includes('aut')) return 'Autel';
+  if (s.includes('jma')) return 'JMA';
+  if (s.includes('keydiy') || s.includes('kdy')) return 'Keydiy';
+  return 'n/a';
+}
+
+function guessMakeFromText(description: string) {
+  const s = description.toLowerCase();
+  if (s.includes('toyota')) return 'Toyota';
+  if (s.includes('ford')) return 'Ford';
+  if (s.includes('gm')) return 'GM';
+  if (s.includes('nissan')) return 'Nissan';
+  if (s.includes('buick')) return 'Buick';
+  if (s.includes('honda')) return 'Honda';
+  if (s.includes('chrysler')) return 'Chrysler';
+  if (s.includes('jeep')) return 'Jeep';
+  if (s.includes('dodge')) return 'Dodge';
+  if (s.includes('hyundai')) return 'Hyundai';
+  if (s.includes('vw') || s.includes('volkswagen')) return 'VW';
+  return 'n/a';
+}
+
+function guessCategoryFromText(sku: string, description: string) {
+  const s = `${sku} ${description}`.toLowerCase();
+  if (sku.startsWith('KB-')) return 'Emergency Blades';
+  if (sku.startsWith('KS-') || sku.startsWith('RS-')) return 'Shells / Cases';
+  if (sku.startsWith('TK-')) return 'Transponder Keys';
+  if (sku.startsWith('TOOL-')) return 'Other / Tools / Accessories';
+  if (sku.startsWith('AC-')) return 'Other / Tools / Accessories';
+  if (s.includes('smart key')) return 'Prox / Smart Keys';
+  if (sku.startsWith('CR-') || s.includes('remote')) return 'Remotes';
+  return 'Other / Tools / Accessories';
+}
+
+function guessKeyTypeFromSku(sku: string, description: string) {
+  const s = `${sku} ${description}`.toLowerCase();
+  if (sku.startsWith('KB-')) return 'Key Blade';
+  if (sku.startsWith('KS-') || sku.startsWith('RS-')) return 'Key Shell';
+  if (sku.startsWith('TK-')) return 'Transponder Key';
+  if (sku.startsWith('AC-') && s.includes('chip')) return 'Chip';
+  if (sku.startsWith('AC-')) return 'Accessory';
+  if (sku.startsWith('CR-')) return 'Remote';
+  if (sku.startsWith('TOOL-')) return 'Tool';
+  return 'n/a';
+}
+
 export default function InventoryNew() {
   const { user } = useAuth();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -75,6 +155,9 @@ export default function InventoryNew() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [refreshing, setRefreshing] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importingPreset, setImportingPreset] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -149,7 +232,9 @@ export default function InventoryNew() {
   });
 
   useEffect(() => {
-    loadInventory();
+    if (user) {
+      loadInventory();
+    }
 
     const handleOpenAdd = () => {
       resetForm();
@@ -158,10 +243,22 @@ export default function InventoryNew() {
 
     window.addEventListener('openAddInventory', handleOpenAdd);
     return () => window.removeEventListener('openAddInventory', handleOpenAdd);
+  }, [user]);
+
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      loadInventory();
+    };
+
+    window.addEventListener('app:refresh', handleAppRefresh);
+    return () => window.removeEventListener('app:refresh', handleAppRefresh);
   }, []);
 
   const loadInventory = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     
     try {
@@ -694,11 +791,109 @@ export default function InventoryNew() {
   };
 
   const handleRefresh = async () => {
-    await loadInventory();
-    toast({
-      title: 'Refreshed',
-      description: 'Inventory data updated',
-    });
+    setRefreshing(true);
+    try {
+      await loadInventory();
+      toast({
+        title: 'Refreshed',
+        description: 'Inventory data updated',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh inventory',
+        variant: 'destructive'
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleImportPreset = async () => {
+    if (importingPreset) return;
+    setImportingPreset(true);
+    try {
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      for (const item of PRESET_IMPORT_ITEMS) {
+        const sku = item.sku.trim();
+        const description = item.description.trim();
+        const qty = Number(item.quantity) || 0;
+
+        const category = normalizeMaybeNA(guessCategoryFromText(sku, description));
+        const keyType = normalizeMaybeNA(guessKeyTypeFromSku(sku, description));
+        const supplier = normalizeMaybeNA(guessSupplierFromText(sku, description));
+        const make = normalizeMaybeNA(guessMakeFromText(description));
+
+        const existing = inventory.find((i) => i.sku?.toLowerCase() === sku.toLowerCase());
+        if (existing) {
+          const updatePayload: any = { quantity: qty };
+
+          if (!existing.item_name || existing.item_name.toLowerCase() === 'n/a' || existing.item_name === existing.sku) {
+            updatePayload.itemName = description;
+          }
+          if (!existing.category || existing.category.toLowerCase() === 'n/a') {
+            updatePayload.category = category;
+          }
+          if (!existing.supplier || existing.supplier.toLowerCase() === 'n/a') {
+            updatePayload.supplier = supplier;
+          }
+          if (!existing.make || existing.make.toLowerCase() === 'n/a') {
+            updatePayload.make = make;
+          }
+          if (!existing.key_type || existing.key_type.toLowerCase() === 'n/a') {
+            updatePayload.keyType = keyType;
+          }
+          if (!(existing as any).model || String((existing as any).model).toLowerCase() === 'n/a') {
+            updatePayload.model = 'n/a';
+          }
+          if (!existing.module || existing.module.toLowerCase() === 'n/a') {
+            updatePayload.module = 'n/a';
+          }
+
+          await api.updateInventoryItem(existing.id, updatePayload);
+          updatedCount += 1;
+        } else {
+          await api.createInventoryItem({
+            itemName: description,
+            sku,
+            keyType,
+            quantity: qty,
+            cost: 0,
+            supplier,
+            category,
+            make,
+            model: 'n/a',
+            module: 'n/a',
+            yearFrom: null,
+            yearTo: null,
+            fccId: null,
+            lowStockThreshold: 3,
+            imageUrl: null,
+          });
+          createdCount += 1;
+        }
+      }
+
+      toast({
+        title: 'Import complete',
+        description: `Created ${createdCount} items • Updated ${updatedCount} items`,
+      });
+
+      setImportDialogOpen(false);
+      await loadInventory();
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to import items',
+        variant: 'destructive',
+      });
+    } finally {
+      setImportingPreset(false);
+    }
   };
 
   // Export to CSV
@@ -804,12 +999,22 @@ export default function InventoryNew() {
               </Button>
               <Button
                 variant="outline"
+                size="sm"
+                onClick={() => setImportDialogOpen(true)}
+                className="gap-2 touch-target"
+              >
+                <FileUp className="h-4 w-4" />
+                <span className="hidden sm:inline">Import List</span>
+              </Button>
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={handleRefresh}
                 className="touch-target"
                 aria-label="Refresh"
+                disabled={refreshing || loading}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
               <InventoryFilters
                 filters={filters}
@@ -1492,6 +1697,52 @@ export default function InventoryNew() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Inventory List</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              This will add the provided list to your inventory. Unknown fields will be saved as <span className="font-medium">n/a</span>.
+            </div>
+            <div className="border rounded-lg max-h-64 overflow-y-auto">
+              {PRESET_IMPORT_ITEMS.map((it) => (
+                <div key={it.sku} className="p-3 border-b last:border-b-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{it.sku}</div>
+                      <div className="text-xs text-muted-foreground">{it.description}</div>
+                    </div>
+                    <Badge variant="secondary" className="shrink-0">Qty: {it.quantity}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setImportDialogOpen(false)}
+                disabled={importingPreset}
+                className="touch-target"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImportPreset}
+                disabled={importingPreset}
+                className="gap-2 touch-target"
+              >
+                <RefreshCw className={`h-4 w-4 ${importingPreset ? 'animate-spin' : ''}`} />
+                Import {PRESET_IMPORT_ITEMS.length} Items
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
       {/* Bulk Edit Dialog */}

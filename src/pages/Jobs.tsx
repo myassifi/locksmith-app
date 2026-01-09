@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 import { api } from '@/integrations/api/client';
 import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO, isValid } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { InventorySelector } from '@/components/InventorySelector';
@@ -121,6 +121,16 @@ export default function Jobs() {
 
     window.addEventListener('openAddJob', handleOpenAdd);
     return () => window.removeEventListener('openAddJob', handleOpenAdd);
+  }, []);
+
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      loadJobs();
+      loadCustomers();
+    };
+
+    window.addEventListener('app:refresh', handleAppRefresh);
+    return () => window.removeEventListener('app:refresh', handleAppRefresh);
   }, []);
 
   // Realtime updates for jobs via Socket.IO
@@ -389,7 +399,7 @@ export default function Jobs() {
 
   // URL-based filters from Dashboard
   const statusFilter = searchParams.get('status'); // 'pending' | 'in_progress' | 'completed'
-  const whenFilter = searchParams.get('when'); // 'today' | 'month' | 'all'
+  const whenFilter = searchParams.get('when'); // 'today' | 'week' | 'month' | 'all'
 
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = (
@@ -400,13 +410,24 @@ export default function Jobs() {
 
     const matchesStatus = statusFilter ? job.status === statusFilter : true;
 
+    const getJobDate = (raw?: string) => {
+      const fallback = new Date(job.created_at);
+      if (!raw) return fallback;
+      const parsed = parseISO(raw);
+      return isValid(parsed) ? parsed : fallback;
+    };
+
     let matchesWhen = true;
     if (whenFilter === 'today') {
-      const d = new Date(job.job_date);
+      const d = getJobDate(job.job_date);
       const now = new Date();
       matchesWhen = d.toDateString() === now.toDateString();
+    } else if (whenFilter === 'week') {
+      const d = getJobDate(job.job_date);
+      const now = new Date();
+      matchesWhen = isWithinInterval(d, { start: startOfWeek(now), end: endOfWeek(now) });
     } else if (whenFilter === 'month') {
-      const d = new Date(job.job_date);
+      const d = getJobDate(job.job_date);
       const now = new Date();
       matchesWhen = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     } // 'all' or missing -> no extra filter

@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { Button } from '@/components/ui/button';
-import { LogOut, Flame, Menu, Sun, Moon } from 'lucide-react';
+import { LogOut, Flame, Menu, Sun, Moon, RefreshCw } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,6 +20,8 @@ export function Layout({ children }: LayoutProps) {
   }
   const { signOut, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -26,6 +30,21 @@ export function Layout({ children }: LayoutProps) {
       window.location.replace('/login');
     } catch (error) {
       console.error('Sign out error:', error);
+    }
+  };
+
+  const handleRefreshApp = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('app:refresh'));
+      }
+      await queryClient.invalidateQueries();
+    } catch (error) {
+      console.error('Refresh app error:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -57,6 +76,16 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefreshApp}
+                disabled={refreshing}
+                className="rounded-full"
+              >
+                <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="sr-only">Refresh</span>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

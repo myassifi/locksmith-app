@@ -75,6 +75,15 @@ export default function Customers() {
     return () => window.removeEventListener('openAddCustomer', handleOpenAdd);
   }, []);
 
+  useEffect(() => {
+    const handleAppRefresh = () => {
+      loadCustomers();
+    };
+
+    window.addEventListener('app:refresh', handleAppRefresh);
+    return () => window.removeEventListener('app:refresh', handleAppRefresh);
+  }, []);
+
   // Real-time updates via Socket.IO
   useCustomersSocket(() => {
     loadCustomers();

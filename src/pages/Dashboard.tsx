@@ -9,7 +9,7 @@ import { api } from '@/integrations/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subDays, isThisMonth, isToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
+import { format, subDays, isThisMonth, isToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, isValid } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,6 +30,7 @@ interface DashboardData {
   // Income metrics
   income: {
     today: number;
+    thisWeek: number;
     thisMonth: number;
     lastMonth: number;
     total: number;
@@ -156,6 +157,12 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const now = new Date();
       const lastMonth = new Date();
       lastMonth.setMonth(now.getMonth() - 1);
+
+      const getJobDate = (job: { job_date?: string; created_at: string }) => {
+        const raw = job.job_date || job.created_at;
+        const parsed = parseISO(raw);
+        return isValid(parsed) ? parsed : new Date(raw);
+      };
       
       const pendingJobs = allJobs.filter(job => job.status === 'pending').length || 0;
       const inProgressJobs = allJobs.filter(job => job.status === 'in_progress').length || 0;
@@ -168,14 +175,25 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       // Calculate income metrics
       // Count income from completed jobs (customer pays on completion)
       const today = allJobs
-        .filter(job => job.status === 'completed' && isToday(new Date(job.created_at)))
+        .filter(job => job.status === 'completed' && isToday(getJobDate(job)))
+        .reduce((sum, job) => {
+          const amount = Number(job.price) || 0;
+          return sum + amount;
+        }, 0) || 0;
+
+      const thisWeekIncome = allJobs
+        .filter(job => job.status === 'completed')
+        .filter(job => {
+          const jobDate = getJobDate(job);
+          return isWithinInterval(jobDate, { start: startOfWeek(now), end: endOfWeek(now) });
+        })
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
         }, 0) || 0;
 
       const thisMonthIncome = allJobs
-        .filter(job => job.status === 'completed' && isThisMonth(new Date(job.created_at)))
+        .filter(job => job.status === 'completed' && isThisMonth(getJobDate(job)))
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
@@ -183,7 +201,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
 
       const lastMonthIncome = allJobs
         .filter(job => {
-          const jobDate = new Date(job.created_at);
+          const jobDate = getJobDate(job);
           return job.status === 'completed' && 
                  jobDate.getMonth() === lastMonth.getMonth() && 
                  jobDate.getFullYear() === lastMonth.getFullYear();
@@ -213,7 +231,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const weeklyIncome = Array.from({ length: 7 }, (_, i) => {
         const date = subDays(now, 6 - i);
         const dayJobs = allJobs.filter(job => {
-          const jobDate = new Date(job.created_at);
+          const jobDate = getJobDate(job);
           return job.status === 'completed' && jobDate.toDateString() === date.toDateString();
         }) || [];
         
@@ -242,7 +260,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const amt = allJobs
           .filter(j => j.status === 'completed')
           .filter(j => {
-            const dt = new Date(j.created_at);
+            const dt = getJobDate(j);
             return dt >= start && dt <= end;
           })
           .reduce((sum, j) => sum + (Number(j.price) || 0), 0);
@@ -270,7 +288,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const upcomingJobs: Job[] = allJobs
         .filter(j => (j.status !== 'completed'))
         .filter(j => {
-          const when = j.job_date ? new Date(j.job_date) : new Date(j.created_at);
+          const when = getJobDate(j);
           return when >= new Date(nowDt.setHours(0,0,0,0)) && when <= sevenDaysOut;
         })
         .sort((a, b) => new Date(a.job_date || a.created_at).getTime() - new Date(b.job_date || b.created_at).getTime())
@@ -298,7 +316,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const monthEnd = endOfMonth(monthStart);
         
         const monthJobs = allJobs.filter((j: any) => {
-          const jobDate = new Date(j.created_at);
+          const jobDate = getJobDate(j);
           return j.status === 'completed' && jobDate >= monthStart && jobDate <= monthEnd;
         });
 
@@ -330,6 +348,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const dashboardData: DashboardData = {
         income: {
           today,
+          thisWeek: thisWeekIncome,
           thisMonth: thisMonthIncome,
           lastMonth: lastMonthIncome,
           total: totalIncome,
@@ -382,6 +401,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>('month');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [lastRefreshAttemptAt, setLastRefreshAttemptAt] = useState<Date | null>(null);
 
   // Helper to navigate to Jobs with filters
   const navigateToJobs = (params: { status?: string; when?: string }) => {
@@ -396,6 +417,8 @@ export default function Dashboard() {
   const {
     data: dashboardData,
     isLoading,
+    isFetching,
+    dataUpdatedAt,
     isError,
     error,
     refetch
@@ -413,7 +436,7 @@ export default function Dashboard() {
   
   // Default data structure
   const defaultData: DashboardData = {
-    income: { today: 0, thisMonth: 0, lastMonth: 0, total: 0, averageJobValue: 0, monthlyGrowth: 0 },
+    income: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0, total: 0, averageJobValue: 0, monthlyGrowth: 0 },
     jobs: { total: 0, pending: 0, inProgress: 0, completed: 0, completionRate: 0, recent: [] },
     weeklyIncome: [],
     jobStatus: [],
@@ -452,6 +475,7 @@ export default function Dashboard() {
         ['INCOME SUMMARY'],
         ['Metric', 'Amount'],
         ['Today\'s Income', `$${data.income.today.toFixed(2)}`],
+        ['Weekly Income', `$${data.income.thisWeek.toFixed(2)}`],
         ['Monthly Income', `$${data.income.thisMonth.toFixed(2)}`],
         ['Last Month Income', `$${data.income.lastMonth.toFixed(2)}`],
         ['Total Income', `$${data.income.total.toFixed(2)}`],
@@ -501,6 +525,28 @@ export default function Dashboard() {
     }
   };
 
+  const handleRefresh = async () => {
+    setLastRefreshAttemptAt(new Date());
+    const toastId = toast.loading('Refreshing dashboard...');
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+      await refetch({ throwOnError: true });
+
+      setLastUpdatedAt(new Date());
+
+      toast.success('Dashboard refreshed', {
+        description: 'Latest data has been loaded'
+      , id: toastId
+      });
+    } catch (error) {
+      console.error('Dashboard refresh error:', error);
+      toast.error('Failed to refresh data', {
+        description: 'Please try again'
+      , id: toastId
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -529,8 +575,12 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => refetch()} className="w-full gap-2">
-              <RefreshCw className="h-4 w-4" />
+            <Button 
+              onClick={handleRefresh}
+              className="w-full gap-2"
+              disabled={isFetching}
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               Try Again
             </Button>
           </CardContent>
@@ -584,12 +634,41 @@ export default function Dashboard() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => refetch()} 
+            onClick={handleRefresh}
             className="px-3"
             title="Refresh"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
+          {(() => {
+            const ts = lastUpdatedAt ?? (dataUpdatedAt ? new Date(dataUpdatedAt) : null);
+            if (isFetching) {
+              return (
+                <span className="text-xs text-muted-foreground">
+                  Refreshing
+                </span>
+              );
+            }
+            if (ts) {
+              return (
+                <span className="text-xs text-muted-foreground">
+                  Updated {format(ts, 'h:mm:ss a')}
+                </span>
+              );
+            }
+            if (lastRefreshAttemptAt) {
+              return (
+                <span className="text-xs text-muted-foreground">
+                  Attempted {format(lastRefreshAttemptAt, 'h:mm:ss a')}
+                </span>
+              );
+            }
+            return (
+              <span className="text-xs text-muted-foreground">
+                Not updated yet
+              </span>
+            );
+          })()}
         </div>
       </div>
 
@@ -615,7 +694,7 @@ export default function Dashboard() {
       {/* Income Overview */}
       <div>
         <h2 className="text-lg font-semibold mb-3 px-1">Income Overview</h2>
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'today' })} className="cursor-pointer hover:shadow-sm transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Income</CardTitle>
@@ -664,6 +743,19 @@ export default function Dashboard() {
               </div>
               <p className="text-xs text-muted-foreground">
                 vs last month
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'week' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Weekly Income</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(data.income.thisWeek)}</div>
+              <p className="text-xs text-muted-foreground">
+                This week
               </p>
             </CardContent>
           </Card>
