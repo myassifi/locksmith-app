@@ -36,6 +36,7 @@ interface Job {
   status: string;
   notes?: string;
   created_at: string;
+  updated_at?: string;
   customers?: {
     name: string;
     phone?: string;
@@ -175,6 +176,7 @@ export default function Jobs() {
         status: job.status,
         notes: job.notes || '',
         created_at: job.createdAt,
+        updated_at: job.updatedAt || job.createdAt,
         customers: job.customer
           ? {
               name: job.customer.name,
@@ -402,10 +404,11 @@ export default function Jobs() {
   const whenFilter = searchParams.get('when'); // 'today' | 'week' | 'month' | 'all'
 
   const filteredJobs = jobs.filter(job => {
+    const search = searchTerm.toLowerCase();
     const matchesSearch = (
-      job.customers?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.job_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (job.vehicle_lock_details || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (job.customers?.name || '').toLowerCase().includes(search) ||
+      (job.job_type || '').toLowerCase().includes(search) ||
+      (job.vehicle_lock_details || '').toLowerCase().includes(search)
     );
 
     const matchesStatus = statusFilter ? job.status === statusFilter : true;
@@ -417,17 +420,25 @@ export default function Jobs() {
       return isValid(parsed) ? parsed : fallback;
     };
 
+    const getWhenDate = () => {
+      const raw =
+        job.status === 'completed'
+          ? job.updated_at || job.job_date || job.created_at
+          : job.job_date || job.created_at;
+      return getJobDate(raw);
+    };
+
     let matchesWhen = true;
     if (whenFilter === 'today') {
-      const d = getJobDate(job.job_date);
+      const d = getWhenDate();
       const now = new Date();
       matchesWhen = d.toDateString() === now.toDateString();
     } else if (whenFilter === 'week') {
-      const d = getJobDate(job.job_date);
+      const d = getWhenDate();
       const now = new Date();
       matchesWhen = isWithinInterval(d, { start: startOfWeek(now), end: endOfWeek(now) });
     } else if (whenFilter === 'month') {
-      const d = getJobDate(job.job_date);
+      const d = getWhenDate();
       const now = new Date();
       matchesWhen = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     } // 'all' or missing -> no extra filter
@@ -841,8 +852,24 @@ export default function Jobs() {
           <Card>
             <CardContent className="p-6 text-center">
               <p className="text-muted-foreground">
-                {searchTerm ? 'No jobs found matching your search.' : 'No jobs added yet.'}
+                {searchTerm || statusFilter || whenFilter
+                  ? 'No jobs found matching your current filters.'
+                  : 'No jobs added yet.'}
               </p>
+              {(statusFilter || whenFilter) && (
+                <div className="mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchParams(new URLSearchParams());
+                    }}
+                    className="h-11 sm:h-8"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
