@@ -23,6 +23,7 @@ interface Job {
   status: 'pending' | 'in_progress' | 'completed';
   price: number;
   created_at: string;
+  updated_at?: string;
   job_date?: string; // optional scheduled date
 }
 
@@ -134,6 +135,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         status: job.status as 'pending' | 'in_progress' | 'completed',
         price: Number(job.price) || 0,
         created_at: job.createdAt,
+        updated_at: job.updatedAt || job.createdAt,
         job_date: job.jobDate || job.createdAt,
         job_type: job.jobType || 'other',
         material_cost: Number(job.materialCost) || 0,
@@ -163,6 +165,12 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const parsed = parseISO(raw);
         return isValid(parsed) ? parsed : new Date(raw);
       };
+
+      const getIncomeDate = (job: { updated_at?: string; job_date?: string; created_at: string }) => {
+        const raw = job.updated_at || job.job_date || job.created_at;
+        const parsed = parseISO(raw);
+        return isValid(parsed) ? parsed : new Date(raw);
+      };
       
       const pendingJobs = allJobs.filter(job => job.status === 'pending').length || 0;
       const inProgressJobs = allJobs.filter(job => job.status === 'in_progress').length || 0;
@@ -175,7 +183,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       // Calculate income metrics
       // Count income from completed jobs (customer pays on completion)
       const today = allJobs
-        .filter(job => job.status === 'completed' && isToday(getJobDate(job)))
+        .filter(job => job.status === 'completed' && isToday(getIncomeDate(job)))
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
@@ -184,7 +192,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const thisWeekIncome = allJobs
         .filter(job => job.status === 'completed')
         .filter(job => {
-          const jobDate = getJobDate(job);
+          const jobDate = getIncomeDate(job);
           return isWithinInterval(jobDate, { start: startOfWeek(now), end: endOfWeek(now) });
         })
         .reduce((sum, job) => {
@@ -193,7 +201,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         }, 0) || 0;
 
       const thisMonthIncome = allJobs
-        .filter(job => job.status === 'completed' && isThisMonth(getJobDate(job)))
+        .filter(job => job.status === 'completed' && isThisMonth(getIncomeDate(job)))
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
@@ -201,7 +209,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
 
       const lastMonthIncome = allJobs
         .filter(job => {
-          const jobDate = getJobDate(job);
+          const jobDate = getIncomeDate(job);
           return job.status === 'completed' && 
                  jobDate.getMonth() === lastMonth.getMonth() && 
                  jobDate.getFullYear() === lastMonth.getFullYear();
@@ -231,7 +239,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const weeklyIncome = Array.from({ length: 7 }, (_, i) => {
         const date = subDays(now, 6 - i);
         const dayJobs = allJobs.filter(job => {
-          const jobDate = getJobDate(job);
+          const jobDate = getIncomeDate(job);
           return job.status === 'completed' && jobDate.toDateString() === date.toDateString();
         }) || [];
         
@@ -260,7 +268,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const amt = allJobs
           .filter(j => j.status === 'completed')
           .filter(j => {
-            const dt = getJobDate(j);
+            const dt = getIncomeDate(j);
             return dt >= start && dt <= end;
           })
           .reduce((sum, j) => sum + (Number(j.price) || 0), 0);
@@ -316,7 +324,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const monthEnd = endOfMonth(monthStart);
         
         const monthJobs = allJobs.filter((j: any) => {
-          const jobDate = getJobDate(j);
+          const jobDate = getIncomeDate(j);
           return j.status === 'completed' && jobDate >= monthStart && jobDate <= monthEnd;
         });
 
@@ -426,12 +434,14 @@ export default function Dashboard() {
     queryKey: ['dashboard-data', dateRange],
     queryFn: () => fetchDashboardData(dateRange),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnMount: 'always',
     retry: 2,
   });
   
   // Real-time updates for jobs via Socket.IO
   useJobsSocket(() => {
     queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+    void refetch();
   });
   
   // Default data structure
