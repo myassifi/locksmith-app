@@ -156,7 +156,6 @@ export default function InventoryNew() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [refreshing, setRefreshing] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importingPreset, setImportingPreset] = useState(false);
   
@@ -791,26 +790,6 @@ export default function InventoryNew() {
     setShowSuggestions(matches.length > 0);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await loadInventory();
-      toast({
-        title: 'Refreshed',
-        description: 'Inventory data updated',
-      });
-    } catch (error) {
-      console.error('Refresh error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to refresh inventory',
-        variant: 'destructive'
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const handleImportPreset = async () => {
     if (importingPreset) return;
     setImportingPreset(true);
@@ -999,16 +978,6 @@ export default function InventoryNew() {
                 <span className="hidden sm:inline">Export</span>
               </Button>
               <InvoiceUpload onComplete={loadInventory} />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                className="touch-target"
-                aria-label="Refresh"
-                disabled={refreshing || loading}
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
               <InventoryFilters
                 filters={filters}
                 onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
