@@ -9,12 +9,16 @@ import { api } from '@/integrations/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subDays, isThisMonth, isToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, isValid } from 'date-fns';
+import { format, subDays, isThisMonth, isToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, isValid, startOfDay, endOfDay, addDays, differenceInCalendarDays, eachDayOfInterval } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useJobsSocket } from '@/hooks/useSocket';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import type { DateRange as DayPickerDateRange } from 'react-day-picker';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 interface Job {
   id: string;
@@ -37,6 +41,21 @@ interface DashboardData {
     total: number;
     averageJobValue: number; // Average value per paid job
     monthlyGrowth: number; // Percentage change from last month
+  };
+
+  selection: {
+    label: string;
+    start: string | null;
+    end: string | null;
+    basis: IncomeDateBasis;
+    income: number;
+    previousIncome: number;
+    changePct: number;
+    completedJobs: number;
+    averageJobValue: number;
+    materialCost: number;
+    profit: number;
+    profitMargin: number;
   };
   
   // Job metrics
@@ -77,7 +96,9 @@ interface DashboardData {
   };
 }
 
-type DateRange = 'today' | 'week' | 'month' | 'lastMonth' | 'all';
+type DateRange = 'today' | 'week' | 'month' | 'lastMonth' | 'all' | 'custom';
+
+type IncomeDateBasis = 'completion' | 'job';
 
 // Job type mappings (same as in Jobs.tsx)
 const jobTypes = [
@@ -126,7 +147,11 @@ const getDateRangeFilter = (range: DateRange) => {
   }
 };
 
-const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<DashboardData> => {
+const fetchDashboardData = async (
+  dateRange: DateRange = 'all',
+  customRange?: DayPickerDateRange,
+  basis: IncomeDateBasis = 'completion'
+): Promise<DashboardData> => {
     try {
       // Fetch all jobs with customer data from local backend
       const allJobsRaw = await api.getJobs();
@@ -171,6 +196,52 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const parsed = parseISO(raw);
         return isValid(parsed) ? parsed : new Date(raw);
       };
+
+      const getBasisDate = (job: { updated_at?: string; job_date?: string; created_at: string }) => {
+        const raw =
+          basis === 'completion'
+            ? (job.updated_at || job.created_at)
+            : (job.job_date || job.created_at);
+        const parsed = parseISO(raw);
+        return isValid(parsed) ? parsed : new Date(raw);
+      };
+
+      const resolveSelectionInterval = () => {
+        if (dateRange === 'custom') {
+          const from = customRange?.from;
+          const to = customRange?.to ?? customRange?.from;
+          if (!from) {
+            return {
+              label: 'Custom',
+              start: null as Date | null,
+              end: null as Date | null,
+            };
+          }
+
+          const start = startOfDay(from);
+          const end = endOfDay(to || from);
+
+          const label = to && differenceInCalendarDays(to, from) !== 0
+            ? `${format(from, 'MMM d, yyyy')} – ${format(to, 'MMM d, yyyy')}`
+            : format(from, 'MMM d, yyyy');
+
+          return { label, start, end };
+        }
+
+        const preset = getDateRangeFilter(dateRange);
+        if (!preset) {
+          return { label: 'All Time', start: null as Date | null, end: null as Date | null };
+        }
+
+        const label = {
+          today: 'Today',
+          week: 'This Week',
+          month: 'This Month',
+          lastMonth: 'Last Month',
+        }[dateRange] || 'All Time';
+
+        return { label, start: preset.start, end: preset.end };
+      };
       
       const pendingJobs = allJobs.filter(job => job.status === 'pending').length || 0;
       const inProgressJobs = allJobs.filter(job => job.status === 'in_progress').length || 0;
@@ -183,7 +254,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       // Calculate income metrics
       // Count income from completed jobs (customer pays on completion)
       const today = allJobs
-        .filter(job => job.status === 'completed' && isToday(getIncomeDate(job)))
+        .filter(job => job.status === 'completed' && isToday(getBasisDate(job)))
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
@@ -192,7 +263,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
       const thisWeekIncome = allJobs
         .filter(job => job.status === 'completed')
         .filter(job => {
-          const jobDate = getIncomeDate(job);
+          const jobDate = getBasisDate(job);
           return isWithinInterval(jobDate, { start: startOfWeek(now), end: endOfWeek(now) });
         })
         .reduce((sum, job) => {
@@ -201,7 +272,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         }, 0) || 0;
 
       const thisMonthIncome = allJobs
-        .filter(job => job.status === 'completed' && isThisMonth(getIncomeDate(job)))
+        .filter(job => job.status === 'completed' && isThisMonth(getBasisDate(job)))
         .reduce((sum, job) => {
           const amount = Number(job.price) || 0;
           return sum + amount;
@@ -209,7 +280,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
 
       const lastMonthIncome = allJobs
         .filter(job => {
-          const jobDate = getIncomeDate(job);
+          const jobDate = getBasisDate(job);
           return job.status === 'completed' && 
                  jobDate.getMonth() === lastMonth.getMonth() && 
                  jobDate.getFullYear() === lastMonth.getFullYear();
@@ -234,23 +305,84 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         ? Math.round(((thisMonthIncome - lastMonthIncome) / lastMonthIncome) * 100)
         : thisMonthIncome > 0 ? 100 : 0;
 
-      // Generate weekly income data (last 7 days)
-      // Weekly income from completed jobs
-      const weeklyIncome = Array.from({ length: 7 }, (_, i) => {
-        const date = subDays(now, 6 - i);
-        const dayJobs = allJobs.filter(job => {
-          const jobDate = getIncomeDate(job);
-          return job.status === 'completed' && jobDate.toDateString() === date.toDateString();
-        }) || [];
-        
-        return {
-          date: format(date, 'EEE'),
-          amount: dayJobs.reduce((sum, job) => {
-            const amount = Number(job.price) || 0;
-            return sum + amount;
-          }, 0)
-        };
-      });
+      const selectionInterval = resolveSelectionInterval();
+      const selectionStart = selectionInterval.start;
+      const selectionEnd = selectionInterval.end;
+
+      const selectionJobs = allJobs
+        .filter(j => j.status === 'completed')
+        .filter(j => {
+          if (!selectionStart || !selectionEnd) return true;
+          const dt = getBasisDate(j);
+          return dt >= selectionStart && dt <= selectionEnd;
+        });
+
+      const selectionIncome = selectionJobs.reduce((sum: number, j: any) => sum + (Number(j.price) || 0), 0);
+      const selectionMaterialCost = selectionJobs.reduce((sum: number, j: any) => sum + (Number(j.material_cost) || 0), 0);
+      const selectionProfit = selectionIncome - selectionMaterialCost;
+      const selectionProfitMargin = selectionIncome > 0 ? (selectionProfit / selectionIncome) * 100 : 0;
+      const selectionCompletedJobs = selectionJobs.length;
+      const selectionAverageJobValue = selectionCompletedJobs > 0 ? selectionIncome / selectionCompletedJobs : 0;
+
+      let previousIncome = 0;
+      let changePct = 0;
+      if (selectionStart && selectionEnd) {
+        const days = differenceInCalendarDays(selectionEnd, selectionStart) + 1;
+        const prevStart = addDays(selectionStart, -days);
+        const prevEnd = addDays(selectionEnd, -days);
+
+        previousIncome = allJobs
+          .filter(j => j.status === 'completed')
+          .filter(j => {
+            const dt = getBasisDate(j);
+            return dt >= prevStart && dt <= prevEnd;
+          })
+          .reduce((sum: number, j: any) => sum + (Number(j.price) || 0), 0);
+
+        changePct = previousIncome > 0
+          ? Math.round(((selectionIncome - previousIncome) / previousIncome) * 100)
+          : selectionIncome > 0 ? 100 : 0;
+      }
+
+      // Income trend series
+      const weeklyIncome = (() => {
+        if (selectionStart && selectionEnd) {
+          const days = differenceInCalendarDays(selectionEnd, selectionStart) + 1;
+          if (days >= 1 && days <= 31) {
+            return eachDayOfInterval({ start: selectionStart, end: selectionEnd }).map((d) => {
+              const dayJobs = allJobs
+                .filter(j => j.status === 'completed')
+                .filter(j => {
+                  const dt = getBasisDate(j);
+                  return dt.toDateString() === d.toDateString();
+                });
+
+              const label = days <= 7 ? format(d, 'EEE') : format(d, 'MMM d');
+
+              return {
+                date: label,
+                amount: dayJobs.reduce((sum, j) => sum + (Number(j.price) || 0), 0),
+              };
+            });
+          }
+        }
+
+        return Array.from({ length: 7 }, (_, i) => {
+          const date = subDays(now, 6 - i);
+          const dayJobs = allJobs.filter(job => {
+            const jobDate = getBasisDate(job);
+            return job.status === 'completed' && jobDate.toDateString() === date.toDateString();
+          }) || [];
+
+          return {
+            date: format(date, 'EEE'),
+            amount: dayJobs.reduce((sum, job) => {
+              const amount = Number(job.price) || 0;
+              return sum + amount;
+            }, 0)
+          };
+        });
+      })();
 
       // Job status distribution - only include statuses with jobs
       const jobStatus = [
@@ -268,7 +400,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const amt = allJobs
           .filter(j => j.status === 'completed')
           .filter(j => {
-            const dt = getIncomeDate(j);
+            const dt = getBasisDate(j);
             return dt >= start && dt <= end;
           })
           .reduce((sum, j) => sum + (Number(j.price) || 0), 0);
@@ -324,7 +456,7 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
         const monthEnd = endOfMonth(monthStart);
         
         const monthJobs = allJobs.filter((j: any) => {
-          const jobDate = getIncomeDate(j);
+          const jobDate = getBasisDate(j);
           return j.status === 'completed' && jobDate >= monthStart && jobDate <= monthEnd;
         });
 
@@ -362,6 +494,20 @@ const fetchDashboardData = async (dateRange: DateRange = 'all'): Promise<Dashboa
           total: totalIncome,
           averageJobValue,
           monthlyGrowth,
+        },
+        selection: {
+          label: selectionInterval.label,
+          start: selectionStart ? format(selectionStart, 'yyyy-MM-dd') : null,
+          end: selectionEnd ? format(selectionEnd, 'yyyy-MM-dd') : null,
+          basis,
+          income: selectionIncome,
+          previousIncome,
+          changePct,
+          completedJobs: selectionCompletedJobs,
+          averageJobValue: selectionAverageJobValue,
+          materialCost: selectionMaterialCost,
+          profit: selectionProfit,
+          profitMargin: selectionProfitMargin,
         },
         jobs: {
           total: totalJobs,
@@ -409,14 +555,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>('month');
+  const [customRange, setCustomRange] = useState<DayPickerDateRange | undefined>(undefined);
+  const [incomeBasis, setIncomeBasis] = useState<IncomeDateBasis>('completion');
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastRefreshAttemptAt, setLastRefreshAttemptAt] = useState<Date | null>(null);
 
   // Helper to navigate to Jobs with filters
-  const navigateToJobs = (params: { status?: string; when?: string }) => {
+  const navigateToJobs = (params: { status?: string; when?: string; from?: string; to?: string; basis?: IncomeDateBasis }) => {
     const search = new URLSearchParams({
       ...(params.status ? { status: params.status } : {}),
       ...(params.when ? { when: params.when } : {}),
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
+      ...(params.basis ? { basis: params.basis } : {}),
     }).toString();
     navigate(`/jobs${search ? `?${search}` : ''}`);
   };
@@ -431,8 +582,14 @@ export default function Dashboard() {
     error,
     refetch
   } = useQuery<DashboardData>({
-    queryKey: ['dashboard-data', dateRange],
-    queryFn: () => fetchDashboardData(dateRange),
+    queryKey: [
+      'dashboard-data',
+      dateRange,
+      incomeBasis,
+      customRange?.from ? format(customRange.from, 'yyyy-MM-dd') : null,
+      customRange?.to ? format(customRange.to, 'yyyy-MM-dd') : null,
+    ],
+    queryFn: () => fetchDashboardData(dateRange, customRange, incomeBasis),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnMount: 'always',
     retry: 2,
@@ -447,6 +604,20 @@ export default function Dashboard() {
   // Default data structure
   const defaultData: DashboardData = {
     income: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0, total: 0, averageJobValue: 0, monthlyGrowth: 0 },
+    selection: {
+      label: 'All Time',
+      start: null,
+      end: null,
+      basis: 'completion',
+      income: 0,
+      previousIncome: 0,
+      changePct: 0,
+      completedJobs: 0,
+      averageJobValue: 0,
+      materialCost: 0,
+      profit: 0,
+      profitMargin: 0,
+    },
     jobs: { total: 0, pending: 0, inProgress: 0, completed: 0, completionRate: 0, recent: [] },
     weeklyIncome: [],
     jobStatus: [],
@@ -473,7 +644,8 @@ export default function Dashboard() {
         week: 'This Week',
         month: 'This Month',
         lastMonth: 'Last Month',
-        all: 'All Time'
+        all: 'All Time',
+        custom: data.selection.label,
       }[dateRange];
       
       // Prepare CSV content
@@ -618,7 +790,15 @@ export default function Dashboard() {
               }
             }}
           />
-          <Select value={dateRange} onValueChange={(value: DateRange) => setDateRange(value)}>
+          <Select
+            value={dateRange}
+            onValueChange={(value: DateRange) => {
+              setDateRange(value);
+              if (value === 'custom') {
+                setCustomRange((prev) => prev?.from ? prev : { from: new Date(), to: new Date() });
+              }
+            }}
+          >
             <SelectTrigger className="w-[140px]">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue />
@@ -629,6 +809,49 @@ export default function Dashboard() {
               <SelectItem value="month">This Month</SelectItem>
               <SelectItem value="lastMonth">Last Month</SelectItem>
               <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="custom">Custom…</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {dateRange === 'custom' && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'justify-start text-left font-normal h-11 sm:h-10',
+                    !customRange?.from && 'text-muted-foreground'
+                  )}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {customRange?.from ? (
+                    customRange.to && differenceInCalendarDays(customRange.to, customRange.from) !== 0
+                      ? `${format(customRange.from, 'MMM d, yyyy')} – ${format(customRange.to, 'MMM d, yyyy')}`
+                      : format(customRange.from, 'MMM d, yyyy')
+                  ) : (
+                    'Pick a date range'
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="range"
+                  selected={customRange}
+                  onSelect={setCustomRange}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+
+          <Select value={incomeBasis} onValueChange={(v: IncomeDateBasis) => setIncomeBasis(v)}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="completion">Count by: Completion</SelectItem>
+              <SelectItem value="job">Count by: Job Date</SelectItem>
             </SelectContent>
           </Select>
           <Button 
@@ -705,98 +928,137 @@ export default function Dashboard() {
       <div>
         <h2 className="text-lg font-semibold mb-3 px-1">Income Overview</h2>
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
-          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'today' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+          <Card
+            role="button"
+            onClick={() =>
+              navigateToJobs({
+                status: 'completed',
+                from: data.selection.start || undefined,
+                to: data.selection.end || undefined,
+                basis: incomeBasis,
+              })
+            }
+            className="cursor-pointer hover:shadow-sm transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Income</CardTitle>
+              <CardTitle className="text-sm font-medium">Income</CardTitle>
               <div className="flex items-center gap-1">
-                {data.income.today > 0 && (
-                  <TrendingUp className="h-4 w-4 text-green-600" />
+                {data.selection.changePct !== 0 && (
+                  data.selection.changePct > 0
+                    ? <ArrowUp className="h-4 w-4 text-green-600" />
+                    : <ArrowDown className="h-4 w-4 text-red-600" />
                 )}
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.income.today)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(data.selection.income)}</div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                {data.income.today > 0 ? (
+                <span className="font-medium">{data.selection.label}</span>
+                {data.selection.start && data.selection.end && (
                   <>
-                    <span className="text-green-600 font-medium">Active</span>
-                    <span>• From completed jobs</span>
+                    <span>•</span>
+                    <span className={data.selection.changePct > 0 ? 'text-green-600' : data.selection.changePct < 0 ? 'text-red-600' : 'text-muted-foreground'}>
+                      {data.selection.changePct > 0 ? '+' : ''}{data.selection.changePct}%
+                    </span>
                   </>
-                ) : (
-                  <span className="text-amber-600">No income today yet</span>
                 )}
               </p>
             </CardContent>
           </Card>
           
-          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'month' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+          <Card
+            role="button"
+            onClick={() =>
+              navigateToJobs({
+                status: 'completed',
+                from: data.selection.start || undefined,
+                to: data.selection.end || undefined,
+                basis: incomeBasis,
+              })
+            }
+            className="cursor-pointer hover:shadow-sm transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Income</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Profit</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-baseline gap-2">
-                <div className="text-2xl font-bold">{formatCurrency(data.income.thisMonth)}</div>
-                {data.income.monthlyGrowth !== 0 && (
-                  <div className={`flex items-center gap-0.5 text-sm font-semibold ${
-                    data.income.monthlyGrowth > 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'
-                  }`}>
-                    {data.income.monthlyGrowth > 0 ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )}
-                    <span>{Math.abs(data.income.monthlyGrowth)}%</span>
-                  </div>
-                )}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(data.selection.profit)}</div>
               <p className="text-xs text-muted-foreground">
-                vs last month
+                Margin {data.selection.profitMargin.toFixed(1)}%
               </p>
             </CardContent>
           </Card>
 
-          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'week' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+          <Card
+            role="button"
+            onClick={() =>
+              navigateToJobs({
+                status: 'completed',
+                from: data.selection.start || undefined,
+                to: data.selection.end || undefined,
+                basis: incomeBasis,
+              })
+            }
+            className="cursor-pointer hover:shadow-sm transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Weekly Income</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Material Cost</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.income.thisWeek)}</div>
-              <p className="text-xs text-muted-foreground">
-                This week
-              </p>
+              <div className="text-2xl font-bold">{formatCurrency(data.selection.materialCost)}</div>
+              <p className="text-xs text-muted-foreground">For completed jobs</p>
             </CardContent>
           </Card>
           
-          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'all' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+          <Card
+            role="button"
+            onClick={() =>
+              navigateToJobs({
+                status: 'completed',
+                from: data.selection.start || undefined,
+                to: data.selection.end || undefined,
+                basis: incomeBasis,
+              })
+            }
+            className="cursor-pointer hover:shadow-sm transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium">Completed Jobs</CardTitle>
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.income.total)}</div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <span className="font-medium text-green-600">{data.jobs.completed}</span>
-                <span>completed jobs</span>
-              </p>
+              <div className="text-2xl font-bold">{data.selection.completedJobs}</div>
+              <p className="text-xs text-muted-foreground">{data.selection.label}</p>
             </CardContent>
           </Card>
           
-          <Card role="button" onClick={() => navigateToJobs({ status: 'completed', when: 'all' })} className="cursor-pointer hover:shadow-sm transition-shadow">
+          <Card
+            role="button"
+            onClick={() =>
+              navigateToJobs({
+                status: 'completed',
+                from: data.selection.start || undefined,
+                to: data.selection.end || undefined,
+                basis: incomeBasis,
+              })
+            }
+            className="cursor-pointer hover:shadow-sm transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Job Value</CardTitle>
               <div className="flex items-center gap-1">
-                {data.jobs.completed > 0 && (
+                {data.selection.completedJobs > 0 && (
                   <TrendingUp className="h-4 w-4 text-primary" />
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.income.averageJobValue)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(data.selection.averageJobValue)}</div>
               <p className="text-xs text-muted-foreground">
-                Per job • <span className="font-medium">{data.jobs.completed}</span> completed
+                Per job • <span className="font-medium">{data.selection.completedJobs}</span> completed
               </p>
             </CardContent>
           </Card>
@@ -807,8 +1069,12 @@ export default function Dashboard() {
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Weekly Income</CardTitle>
-            <CardDescription>Income for the past 7 days</CardDescription>
+            <CardTitle>Income Trend</CardTitle>
+            <CardDescription>
+              {data.selection.label}
+              {' • '}
+              {incomeBasis === 'completion' ? 'Count by completion date' : 'Count by job date'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {data.weeklyIncome.every(day => day.amount === 0) ? (

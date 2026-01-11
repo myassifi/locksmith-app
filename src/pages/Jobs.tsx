@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 import { api } from '@/integrations/api/client';
 import { toast } from '@/hooks/use-toast';
-import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO, isValid } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO, isValid, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { InventorySelector } from '@/components/InventorySelector';
@@ -402,6 +402,10 @@ export default function Jobs() {
   // URL-based filters from Dashboard
   const statusFilter = searchParams.get('status'); // 'pending' | 'in_progress' | 'completed'
   const whenFilter = searchParams.get('when'); // 'today' | 'week' | 'month' | 'all'
+  const fromFilter = searchParams.get('from'); // yyyy-MM-dd
+  const toFilter = searchParams.get('to'); // yyyy-MM-dd
+  const basisFilter = (searchParams.get('basis') as 'completion' | 'job' | null) || null;
+  const hasRangeFilter = Boolean(fromFilter || toFilter);
 
   const filteredJobs = jobs.filter(job => {
     const search = searchTerm.toLowerCase();
@@ -420,6 +424,18 @@ export default function Jobs() {
       return isValid(parsed) ? parsed : fallback;
     };
 
+    const getBasisDateForFilter = () => {
+      const basis = basisFilter || 'completion';
+      const raw =
+        basis === 'completion'
+          ? job.updated_at || job.created_at
+          : job.job_date || job.created_at;
+      return getJobDate(raw);
+    };
+
+    const rangeStart = fromFilter ? startOfDay(getJobDate(fromFilter)) : null;
+    const rangeEnd = (toFilter || fromFilter) ? endOfDay(getJobDate(toFilter || fromFilter || '')) : null;
+
     const getWhenDate = () => {
       const raw =
         job.status === 'completed'
@@ -429,7 +445,10 @@ export default function Jobs() {
     };
 
     let matchesWhen = true;
-    if (whenFilter === 'today') {
+    if (hasRangeFilter && rangeStart && rangeEnd) {
+      const d = getBasisDateForFilter();
+      matchesWhen = d >= rangeStart && d <= rangeEnd;
+    } else if (whenFilter === 'today') {
       const d = getWhenDate();
       const now = new Date();
       matchesWhen = d.toDateString() === now.toDateString();
@@ -831,7 +850,7 @@ export default function Jobs() {
             🟢 Completed ({jobs.filter(j => j.status === 'completed').length})
           </Badge>
           
-          {(statusFilter || whenFilter) && (
+          {(statusFilter || whenFilter || hasRangeFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -852,11 +871,11 @@ export default function Jobs() {
           <Card>
             <CardContent className="p-6 text-center">
               <p className="text-muted-foreground">
-                {searchTerm || statusFilter || whenFilter
+                {searchTerm || statusFilter || whenFilter || hasRangeFilter
                   ? 'No jobs found matching your current filters.'
                   : 'No jobs added yet.'}
               </p>
-              {(statusFilter || whenFilter) && (
+              {(statusFilter || whenFilter || hasRangeFilter) && (
                 <div className="mt-4">
                   <Button
                     variant="outline"
