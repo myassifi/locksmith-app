@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy } from 'lucide-react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy, Sparkles } from 'lucide-react';
 import InvoiceUpload from '@/components/invoice/InvoiceUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,8 +78,29 @@ const PRESET_IMPORT_ITEMS: Array<{ sku: string; description: string; quantity: n
 ];
 
 function normalizeMaybeNA(value: string | null | undefined) {
-  const v = (value ?? '').trim();
-  return v ? v : 'n/a';
+  if (!value) return 'n/a';
+  const v = value.trim();
+  if (!v) return 'n/a';
+  if (v.toLowerCase() === 'na') return 'n/a';
+  if (v.toLowerCase() === 'n/a') return 'n/a';
+  return v;
+}
+
+function normalizeCleanText(value: unknown) {
+  if (typeof value !== 'string') return '';
+  const v = value.trim().replace(/\s+/g, ' ');
+  if (!v) return '';
+  const lower = v.toLowerCase();
+  if (lower === 'na' || lower === 'n/a') return '';
+  return v;
+}
+
+function normalizeCleanCode(value: unknown) {
+  return normalizeCleanText(value).toUpperCase().replace(/\s+/g, '');
+}
+
+function isYearRange(value: string) {
+  return /^\d{4}\s*-\s*\d{4}$/.test(value.trim());
 }
 
 function guessSupplierFromText(sku: string, description: string) {
@@ -158,6 +179,8 @@ export default function InventoryNew() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importingPreset, setImportingPreset] = useState(false);
+  const [cleanDialogOpen, setCleanDialogOpen] = useState(false);
+  const [cleaningData, setCleaningData] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -316,6 +339,97 @@ export default function InventoryNew() {
       outOfStock: inventory.filter(i => i.quantity === 0).length,
     };
   }, [inventory]);
+
+  const cleanPlan = useMemo(() => {
+    const changes: Array<{ id: string; sku: string; name: string; updates: Record<string, any> }> = [];
+    const skuCounts = new Map<string, number>();
+
+    for (const item of inventory) {
+      const normalizedSku = normalizeCleanCode(item.sku);
+      if (normalizedSku) {
+        skuCounts.set(normalizedSku, (skuCounts.get(normalizedSku) || 0) + 1);
+      }
+    }
+
+    for (const item of inventory) {
+      const updates: Record<string, any> = {};
+
+      const nextSkuRaw = normalizeCleanCode(item.sku);
+      const nextSku = isYearRange(nextSkuRaw) ? '' : nextSkuRaw;
+      if (nextSku !== normalizeCleanCode(item.sku)) updates.sku = nextSku;
+
+      const nextFcc = normalizeCleanCode(item.fcc_id);
+      if (nextFcc !== normalizeCleanCode(item.fcc_id)) updates.fcc_id = nextFcc;
+
+      const nextName = normalizeCleanText(item.item_name) || nextSku || '';
+      if (nextName !== normalizeCleanText(item.item_name)) updates.item_name = nextName;
+
+      const nextSupplier = normalizeCleanText(item.supplier);
+      if (nextSupplier !== normalizeCleanText(item.supplier)) updates.supplier = nextSupplier;
+
+      const nextCategory = normalizeCleanText(item.category);
+      if (nextCategory !== normalizeCleanText(item.category)) updates.category = nextCategory;
+
+      const nextMake = normalizeCleanText(item.make);
+      if (nextMake !== normalizeCleanText(item.make)) updates.make = nextMake;
+
+      const nextModel = normalizeCleanText(item.model);
+      if (nextModel !== normalizeCleanText(item.model)) updates.model = nextModel;
+
+      const nextModule = normalizeCleanText(item.module);
+      if (nextModule !== normalizeCleanText(item.module)) updates.module = nextModule;
+
+      const nextKeyType = normalizeCleanText(item.key_type);
+      if (nextKeyType !== normalizeCleanText(item.key_type)) updates.key_type = nextKeyType;
+
+      const touched = Object.keys(updates);
+      if (touched.length > 0) {
+        changes.push({
+          id: item.id,
+          sku: item.sku,
+          name: item.item_name || '',
+          updates
+        });
+      }
+    }
+
+    const duplicateSkus = Array.from(skuCounts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([sku]) => sku);
+
+    return { changes, duplicateSkus };
+  }, [inventory]);
+
+  const applyCleanData = async () => {
+    if (cleaningData) return;
+    if (cleanPlan.changes.length === 0) {
+      toast({ title: 'Nothing to clean', description: 'Your inventory is already clean.' });
+      setCleanDialogOpen(false);
+      return;
+    }
+
+    setCleaningData(true);
+    try {
+      for (const change of cleanPlan.changes) {
+        await api.updateInventoryItem(change.id, change.updates);
+      }
+      await loadInventory();
+      toast({
+        title: 'Cleaned',
+        description: `Updated ${cleanPlan.changes.length} items`,
+      });
+      setCleanDialogOpen(false);
+    } catch (error) {
+      console.error('Clean data error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to clean inventory data',
+        variant: 'destructive'
+      });
+    } finally {
+      setCleaningData(false);
+    }
+  };
 
   // Filter and search logic
   const filteredInventory = useMemo(() => {
@@ -977,6 +1091,16 @@ export default function InventoryNew() {
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Export</span>
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCleanDialogOpen(true)}
+                className="gap-2 touch-target"
+                disabled={inventory.length === 0}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Clean Data</span>
+              </Button>
               <InvoiceUpload onComplete={loadInventory} />
               <InventoryFilters
                 filters={filters}
@@ -1429,6 +1553,64 @@ export default function InventoryNew() {
           </div>
         </>
       )}
+
+      <Dialog open={cleanDialogOpen} onOpenChange={(open) => { if (!cleaningData) setCleanDialogOpen(open); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Clean Inventory Data</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              {cleanPlan.changes.length === 0
+                ? 'No cleanup needed.'
+                : `Will update ${cleanPlan.changes.length} item${cleanPlan.changes.length === 1 ? '' : 's'}.`}
+            </div>
+
+            {cleanPlan.duplicateSkus.length > 0 && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Duplicates detected</AlertTitle>
+                <AlertDescription>
+                  Found {cleanPlan.duplicateSkus.length} duplicate SKU{cleanPlan.duplicateSkus.length === 1 ? '' : 's'}. Cleaning will not merge duplicates.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {cleanPlan.changes.length > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr className="text-left text-xs">
+                      <th className="p-2 font-medium">SKU</th>
+                      <th className="p-2 font-medium">Name</th>
+                      <th className="p-2 font-medium">Fixes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cleanPlan.changes.slice(0, 8).map((c) => (
+                      <tr key={c.id} className="border-t text-sm">
+                        <td className="p-2 font-mono text-xs">{c.sku || '-'}</td>
+                        <td className="p-2">{c.name || '-'}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{Object.keys(c.updates).join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCleanDialogOpen(false)} disabled={cleaningData} className="touch-target">
+                Cancel
+              </Button>
+              <Button onClick={applyCleanData} disabled={cleaningData || cleanPlan.changes.length === 0} className="touch-target">
+                {cleaningData ? 'Cleaning...' : 'Apply'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
