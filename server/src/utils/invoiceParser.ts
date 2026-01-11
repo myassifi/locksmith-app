@@ -14,6 +14,11 @@ export function detectSupplier(text: string): string {
   if (text.includes('locksmithkeyless.com')) {
     return 'locksmithkeyless';
   }
+  // Some invoices don't include the domain in extracted PDF text; detect by structure.
+  // locksmithkeyless-style invoices commonly include explicit SKU lines plus an xN quantity.
+  if (/\bSKU\s*:\s*[A-Z0-9\-]{3,}\b/i.test(text) && /\bx\s*\d{1,4}\b/i.test(text)) {
+    return 'locksmithkeyless';
+  }
   return 'generic';
 }
 
@@ -110,6 +115,88 @@ export function parseKey4Invoice(text: string): ParsedInventoryItem[] {
   return items;
 }
 
+function isLikelyYearRangeSku(sku: string) {
+  return /^\d{4}\s*-\s*\d{4}$/.test(sku.trim());
+}
+
+export function parseLocksmithKeylessInvoice(text: string): ParsedInventoryItem[] {
+  const items: ParsedInventoryItem[] = [];
+
+  const lines = text
+    .split('\n')
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter((l) => l.length > 0);
+
+  const skuLinePattern = /^SKU\s*:\s*([A-Z0-9\-]{3,})\b/i;
+  const qtyPattern = /\bx\s*(\d{1,4})\b/i;
+  const pricePattern = /\$\s*([0-9]+(?:\.[0-9]{1,2})?)/;
+
+  let blockStart = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const skuMatch = lines[i].match(skuLinePattern);
+    if (!skuMatch) continue;
+
+    const sku = skuMatch[1].trim();
+    if (!sku || isLikelyYearRangeSku(sku)) {
+      blockStart = i + 1;
+      continue;
+    }
+
+    let quantity = 1;
+    let price: number | null = null;
+
+    for (let j = i; j <= Math.min(lines.length - 1, i + 4); j++) {
+      const q = lines[j].match(qtyPattern);
+      if (q) {
+        const parsed = parseInt(q[1], 10);
+        if (Number.isFinite(parsed) && parsed > 0) quantity = parsed;
+      }
+    }
+
+    for (let j = Math.max(0, i - 6); j <= Math.min(lines.length - 1, i + 2); j++) {
+      const m = lines[j].match(pricePattern);
+      if (m) {
+        const parsed = parseFloat(m[1]);
+        if (Number.isFinite(parsed)) {
+          price = parsed;
+          break;
+        }
+      }
+    }
+
+    const descParts: string[] = [];
+    for (let j = blockStart; j < i; j++) {
+      const l = lines[j];
+      if (skuLinePattern.test(l)) continue;
+      if (/^No\./i.test(l)) continue;
+      if (qtyPattern.test(l) && l.replace(qtyPattern, '').trim().length === 0) continue;
+      if (pricePattern.test(l) && l.replace(pricePattern, '').trim().length === 0) continue;
+      descParts.push(l);
+    }
+    const description = descParts.join(' ').replace(/\s+/g, ' ').trim();
+
+    if (price === null || !description) {
+      blockStart = i + 1;
+      continue;
+    }
+
+    items.push({
+      sku,
+      description,
+      price,
+      quantity,
+      total: price * quantity,
+      supplier: 'locksmithkeyless.com',
+      category: 'Uncategorized'
+    });
+
+    blockStart = i + 1;
+  }
+
+  return items;
+}
+
 /**
  * Parse Transponder Island invoices
  */
@@ -149,11 +236,12 @@ export function parseGenericInvoice(text: string): ParsedInventoryItem[] {
   const lines = text.split('\n');
   
   // Look for lines with: [SKU/Code] [Description] [Price] [Qty]
-  const pattern = /([A-Z0-9\-]{5,20})\s+(.+?)\s+\$?([0-9.]+)\s+(\d+)/;
+  const pattern = /([A-Z0-9][A-Z0-9\-]{4,19})\s+(.+?)\s+\$([0-9]+(?:\.[0-9]{1,2})?)\s+(\d+)/;
   
   lines.forEach(line => {
     const match = line.match(pattern);
     if (match) {
+      if (isLikelyYearRangeSku(match[1])) return;
       items.push({
         sku: match[1],
         description: match[2].trim(),
@@ -200,8 +288,13 @@ export function parseInvoice(text: string): {
     items = parseKey4Invoice(text);
   } else if (supplier === 'transponderisland') {
     items = parseTransponderIslandInvoice(text);
+  } else if (supplier === 'locksmithkeyless') {
+    items = parseLocksmithKeylessInvoice(text);
   } else {
-    items = parseGenericInvoice(text);
+    // As a defensive fallback, try the SKU:/xN parser first. If it finds anything,
+    // prefer it over the generic regex which is prone to false positives (years/makes).
+    const lkItems = parseLocksmithKeylessInvoice(text);
+    items = lkItems.length > 0 ? lkItems : parseGenericInvoice(text);
   }
   
   return {
