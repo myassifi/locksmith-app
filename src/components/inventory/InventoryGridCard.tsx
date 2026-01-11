@@ -27,13 +27,16 @@ interface InventoryItem {
 
 interface InventoryGridCardProps {
   item: InventoryItem;
+  showReorderNeed?: boolean;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => Promise<void>;
 }
 
-export function InventoryGridCard({ item, onEdit, onDelete }: InventoryGridCardProps) {
+export function InventoryGridCard({ item, showReorderNeed, onEdit, onDelete }: InventoryGridCardProps) {
   const isLowStock = item.low_stock_threshold && item.quantity <= item.low_stock_threshold;
   const isOutOfStock = item.quantity === 0;
+  const threshold = item.low_stock_threshold || 3;
+  const reorderNeed = Math.max(0, threshold - item.quantity);
 
   return (
     <Card className="group relative overflow-hidden hover:shadow-lg transition-shadow duration-200">
@@ -120,6 +123,9 @@ export function InventoryGridCard({ item, onEdit, onDelete }: InventoryGridCardP
                 {item.quantity}
               </div>
               <div className="text-xs text-muted-foreground">In Stock</div>
+              {showReorderNeed && reorderNeed > 0 && (
+                <div className="text-xs font-medium text-primary">Need {reorderNeed}</div>
+              )}
             </div>
           </div>
 

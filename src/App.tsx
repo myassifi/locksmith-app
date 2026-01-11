@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,12 +8,12 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "rea
 import { AuthProvider } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
-import Dashboard from "./pages/Dashboard";
-import Customers from "./pages/Customers";
-import Jobs from "./pages/Jobs";
-import Inventory from "./pages/Inventory";
-import Actions from "./pages/Actions";
-import Settings from "./pages/Settings";
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Jobs = lazy(() => import('./pages/Jobs'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Actions = lazy(() => import('./pages/Actions'));
+const Settings = lazy(() => import('./pages/Settings'));
 import Login from "./pages/login";
 
 const queryClient = new QueryClient();
@@ -40,7 +41,15 @@ function ProtectedLayout() {
   return (
     <RequireAuth>
       <Layout>
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </Layout>
     </RequireAuth>
   );

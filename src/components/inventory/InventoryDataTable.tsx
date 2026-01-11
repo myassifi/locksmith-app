@@ -26,12 +26,13 @@ interface InventoryItem {
 
 interface InventoryDataTableProps {
   data: InventoryItem[];
+  showReorderNeed?: boolean;
   onQuantityChange: (id: string, newQuantity: number) => Promise<void>;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => Promise<void>;
 }
 
-export function InventoryDataTable({ data, onQuantityChange, onEdit, onDelete }: InventoryDataTableProps) {
+export function InventoryDataTable({ data, showReorderNeed, onQuantityChange, onEdit, onDelete }: InventoryDataTableProps) {
   return (
     <div className="rounded-md border">
       <table className="w-full">
@@ -43,6 +44,9 @@ export function InventoryDataTable({ data, onQuantityChange, onEdit, onDelete }:
             <th className="p-3 text-left text-sm font-medium">Make</th>
             <th className="p-3 text-left text-sm font-medium">Model</th>
             <th className="p-3 text-right text-sm font-medium">Quantity</th>
+            {showReorderNeed && (
+              <th className="p-3 text-right text-sm font-medium">Need</th>
+            )}
             <th className="p-3 text-right text-sm font-medium">Unit Cost</th>
             <th className="p-3 text-left text-sm font-medium">Supplier</th>
             <th className="p-3 text-right text-sm font-medium">Actions</th>
@@ -51,6 +55,8 @@ export function InventoryDataTable({ data, onQuantityChange, onEdit, onDelete }:
         <tbody>
           {data.map((item) => {
             const isLowStock = item.low_stock_threshold && item.quantity <= item.low_stock_threshold;
+            const threshold = item.low_stock_threshold || 3;
+            const reorderNeed = Math.max(0, threshold - item.quantity);
             return (
               <tr key={item.id} className="border-b hover:bg-muted/50">
                 <td className="p-3">
@@ -78,6 +84,9 @@ export function InventoryDataTable({ data, onQuantityChange, onEdit, onDelete }:
                 <td className="p-3 text-sm text-muted-foreground">{item.make || '-'}</td>
                 <td className="p-3 text-sm text-muted-foreground">{item.model || '-'}</td>
                 <td className="p-3 text-right font-medium">{item.quantity}</td>
+                {showReorderNeed && (
+                  <td className="p-3 text-right font-medium text-primary">{reorderNeed}</td>
+                )}
                 <td className="p-3 text-right">{formatCurrency(item.cost || 0)}</td>
                 <td className="p-3 text-sm text-muted-foreground">{item.supplier || '-'}</td>
                 <td className="p-3">

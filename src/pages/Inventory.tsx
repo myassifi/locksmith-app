@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp } from 'lucide-react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy } from 'lucide-react';
 import InvoiceUpload from '@/components/invoice/InvoiceUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -344,7 +344,7 @@ export default function InventoryNew() {
         if (activeTab === 'in-stock') return item.quantity > threshold;
         if (activeTab === 'reorder') {
           // Smart reorder logic: items at or below threshold OR out of stock
-          return item.quantity <= threshold;
+          return item.quantity < threshold;
         }
         return true;
       });
@@ -418,7 +418,7 @@ export default function InventoryNew() {
   const stats = useMemo(() => {
     const lowStockItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3) && i.quantity > 0);
     const outOfStockItems = inventory.filter(i => i.quantity === 0);
-    const reorderItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3));
+    const reorderItems = inventory.filter(i => i.quantity < (i.low_stock_threshold || 3));
     
     return {
       all: inventory.length,
@@ -1112,6 +1112,44 @@ export default function InventoryNew() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={async () => {
+                      try {
+                        const reorderList = filteredInventory.map(item => {
+                          const threshold = item.low_stock_threshold || 3;
+                          const need = Math.max(0, threshold - item.quantity);
+                          const unitCost = item.cost || 0;
+                          return {
+                            sku: item.sku,
+                            name: item.item_name || item.sku,
+                            current: item.quantity,
+                            threshold,
+                            need,
+                            supplier: item.supplier || 'N/A',
+                            cost: unitCost,
+                            estimatedCost: need * unitCost,
+                          };
+                        });
+
+                        const text = reorderList
+                          .sort((a, b) => a.supplier.localeCompare(b.supplier))
+                          .map(i => `${i.supplier} | ${i.sku} | ${i.name} | Need ${i.need} (have ${i.current}, threshold ${i.threshold})`)
+                          .join('\n');
+
+                        await navigator.clipboard.writeText(text);
+                        toast({ title: 'Copied', description: 'Reorder list copied to clipboard' });
+                      } catch (err) {
+                        console.error('Copy reorder list failed:', err);
+                        toast({ title: 'Error', description: 'Failed to copy reorder list', variant: 'destructive' });
+                      }
+                    }}
+                    className="bg-white dark:bg-gray-800"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copy List
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       // Export reorder list
                       const reorderList = filteredInventory.map(item => ({
@@ -1119,13 +1157,21 @@ export default function InventoryNew() {
                         name: item.item_name || item.sku,
                         current: item.quantity,
                         threshold: item.low_stock_threshold || 3,
+                        need: Math.max(0, (item.low_stock_threshold || 3) - item.quantity),
                         supplier: item.supplier || 'N/A',
-                        cost: item.cost || 0
+                        cost: item.cost || 0,
+                        estimatedCost: Math.max(0, (item.low_stock_threshold || 3) - item.quantity) * (item.cost || 0)
                       }));
+
+                      const csvEscape = (v: unknown) => {
+                        const s = String(v ?? '');
+                        return `"${s.replace(/"/g, '""')}"`;
+                      };
+
                       const csv = [
-                        ['SKU', 'Item Name', 'Current Qty', 'Threshold', 'Supplier', 'Unit Cost'],
-                        ...reorderList.map(i => [i.sku, i.name, i.current, i.threshold, i.supplier, i.cost])
-                      ].map(row => row.join(',')).join('\n');
+                        ['SKU', 'Item Name', 'Current Qty', 'Threshold', 'Need', 'Supplier', 'Unit Cost', 'Estimated Cost'],
+                        ...reorderList.map(i => [i.sku, i.name, i.current, i.threshold, i.need, i.supplier, i.cost, i.estimatedCost])
+                      ].map(row => row.map(csvEscape).join(',')).join('\n');
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
@@ -1382,6 +1428,7 @@ export default function InventoryNew() {
                   <InventoryGridCard
                     key={item.id}
                     item={item}
+                    showReorderNeed={activeTab === 'reorder'}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
@@ -1390,6 +1437,7 @@ export default function InventoryNew() {
             ) : (
               <InventoryDataTable
                 data={filteredInventory}
+                showReorderNeed={activeTab === 'reorder'}
                 onQuantityChange={handleQuantityChange}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
@@ -1403,6 +1451,7 @@ export default function InventoryNew() {
               <SwipeableInventoryCard
                 key={item.id}
                 item={item}
+                showReorderNeed={activeTab === 'reorder'}
                 onQuantityChange={handleQuantityChange}
                 onEdit={handleEdit}
                 onDelete={handleDelete}

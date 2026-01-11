@@ -27,13 +27,16 @@ interface InventoryItem {
 
 interface SwipeableInventoryCardProps {
   item: InventoryItem;
+  showReorderNeed?: boolean;
   onQuantityChange: (id: string, qty: number) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
 }
 
-export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelete }: SwipeableInventoryCardProps) {
+export function SwipeableInventoryCard({ item, showReorderNeed, onQuantityChange, onEdit, onDelete }: SwipeableInventoryCardProps) {
   const isLowStock = item.quantity <= (item.low_stock_threshold || 3);
+  const threshold = item.low_stock_threshold || 3;
+  const reorderNeed = Math.max(0, threshold - item.quantity);
   
   return (
     <Card className="relative overflow-hidden mb-3">
@@ -66,6 +69,11 @@ export function SwipeableInventoryCard({ item, onQuantityChange, onEdit, onDelet
                   {isLowStock && (
                     <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5">
                       Low Stock
+                    </Badge>
+                  )}
+                  {showReorderNeed && reorderNeed > 0 && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
+                      Need {reorderNeed}
                     </Badge>
                   )}
                 </div>
