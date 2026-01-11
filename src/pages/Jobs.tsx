@@ -404,7 +404,6 @@ export default function Jobs() {
   const whenFilter = searchParams.get('when'); // 'today' | 'week' | 'month' | 'all'
   const fromFilter = searchParams.get('from'); // yyyy-MM-dd
   const toFilter = searchParams.get('to'); // yyyy-MM-dd
-  const basisFilter = (searchParams.get('basis') as 'completion' | 'job' | null) || null;
   const hasRangeFilter = Boolean(fromFilter || toFilter);
 
   const filteredJobs = jobs.filter(job => {
@@ -424,15 +423,6 @@ export default function Jobs() {
       return isValid(parsed) ? parsed : fallback;
     };
 
-    const getBasisDateForFilter = () => {
-      const basis = basisFilter || 'completion';
-      const raw =
-        basis === 'completion'
-          ? job.updated_at || job.created_at
-          : job.job_date || job.created_at;
-      return getJobDate(raw);
-    };
-
     const rangeStart = fromFilter ? startOfDay(getJobDate(fromFilter)) : null;
     const rangeEnd = (toFilter || fromFilter) ? endOfDay(getJobDate(toFilter || fromFilter || '')) : null;
 
@@ -446,7 +436,7 @@ export default function Jobs() {
 
     let matchesWhen = true;
     if (hasRangeFilter && rangeStart && rangeEnd) {
-      const d = getBasisDateForFilter();
+      const d = getWhenDate();
       matchesWhen = d >= rangeStart && d <= rangeEnd;
     } else if (whenFilter === 'today') {
       const d = getWhenDate();

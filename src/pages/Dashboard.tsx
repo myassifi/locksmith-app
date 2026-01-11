@@ -47,7 +47,6 @@ interface DashboardData {
     label: string;
     start: string | null;
     end: string | null;
-    basis: IncomeDateBasis;
     income: number;
     previousIncome: number;
     changePct: number;
@@ -98,8 +97,6 @@ interface DashboardData {
 
 type DateRange = 'today' | 'week' | 'month' | 'lastMonth' | 'all' | 'custom';
 
-type IncomeDateBasis = 'completion' | 'job';
-
 // Job type mappings (same as in Jobs.tsx)
 const jobTypes = [
   { value: 'spare_key', label: 'Spare Key' },
@@ -149,8 +146,7 @@ const getDateRangeFilter = (range: DateRange) => {
 
 const fetchDashboardData = async (
   dateRange: DateRange = 'all',
-  customRange?: DayPickerDateRange,
-  basis: IncomeDateBasis = 'completion'
+  customRange?: DayPickerDateRange
 ): Promise<DashboardData> => {
     try {
       // Fetch all jobs with customer data from local backend
@@ -198,10 +194,7 @@ const fetchDashboardData = async (
       };
 
       const getBasisDate = (job: { updated_at?: string; job_date?: string; created_at: string }) => {
-        const raw =
-          basis === 'completion'
-            ? (job.updated_at || job.created_at)
-            : (job.job_date || job.created_at);
+        const raw = job.updated_at || job.created_at;
         const parsed = parseISO(raw);
         return isValid(parsed) ? parsed : new Date(raw);
       };
@@ -499,7 +492,6 @@ const fetchDashboardData = async (
           label: selectionInterval.label,
           start: selectionStart ? format(selectionStart, 'yyyy-MM-dd') : null,
           end: selectionEnd ? format(selectionEnd, 'yyyy-MM-dd') : null,
-          basis,
           income: selectionIncome,
           previousIncome,
           changePct,
@@ -556,18 +548,16 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>('month');
   const [customRange, setCustomRange] = useState<DayPickerDateRange | undefined>(undefined);
-  const [incomeBasis, setIncomeBasis] = useState<IncomeDateBasis>('completion');
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastRefreshAttemptAt, setLastRefreshAttemptAt] = useState<Date | null>(null);
 
   // Helper to navigate to Jobs with filters
-  const navigateToJobs = (params: { status?: string; when?: string; from?: string; to?: string; basis?: IncomeDateBasis }) => {
+  const navigateToJobs = (params: { status?: string; when?: string; from?: string; to?: string }) => {
     const search = new URLSearchParams({
       ...(params.status ? { status: params.status } : {}),
       ...(params.when ? { when: params.when } : {}),
       ...(params.from ? { from: params.from } : {}),
       ...(params.to ? { to: params.to } : {}),
-      ...(params.basis ? { basis: params.basis } : {}),
     }).toString();
     navigate(`/jobs${search ? `?${search}` : ''}`);
   };
@@ -585,11 +575,10 @@ export default function Dashboard() {
     queryKey: [
       'dashboard-data',
       dateRange,
-      incomeBasis,
       customRange?.from ? format(customRange.from, 'yyyy-MM-dd') : null,
       customRange?.to ? format(customRange.to, 'yyyy-MM-dd') : null,
     ],
-    queryFn: () => fetchDashboardData(dateRange, customRange, incomeBasis),
+    queryFn: () => fetchDashboardData(dateRange, customRange),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnMount: 'always',
     retry: 2,
@@ -608,7 +597,6 @@ export default function Dashboard() {
       label: 'All Time',
       start: null,
       end: null,
-      basis: 'completion',
       income: 0,
       previousIncome: 0,
       changePct: 0,
@@ -844,16 +832,6 @@ export default function Dashboard() {
               </PopoverContent>
             </Popover>
           )}
-
-          <Select value={incomeBasis} onValueChange={(v: IncomeDateBasis) => setIncomeBasis(v)}>
-            <SelectTrigger className="w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="completion">Count by: Completion</SelectItem>
-              <SelectItem value="job">Count by: Job Date</SelectItem>
-            </SelectContent>
-          </Select>
           <Button 
             variant="outline" 
             size="sm" 
@@ -935,7 +913,6 @@ export default function Dashboard() {
                 status: 'completed',
                 from: data.selection.start || undefined,
                 to: data.selection.end || undefined,
-                basis: incomeBasis,
               })
             }
             className="cursor-pointer hover:shadow-sm transition-shadow"
@@ -974,7 +951,6 @@ export default function Dashboard() {
                 status: 'completed',
                 from: data.selection.start || undefined,
                 to: data.selection.end || undefined,
-                basis: incomeBasis,
               })
             }
             className="cursor-pointer hover:shadow-sm transition-shadow"
@@ -998,7 +974,6 @@ export default function Dashboard() {
                 status: 'completed',
                 from: data.selection.start || undefined,
                 to: data.selection.end || undefined,
-                basis: incomeBasis,
               })
             }
             className="cursor-pointer hover:shadow-sm transition-shadow"
@@ -1020,7 +995,6 @@ export default function Dashboard() {
                 status: 'completed',
                 from: data.selection.start || undefined,
                 to: data.selection.end || undefined,
-                basis: incomeBasis,
               })
             }
             className="cursor-pointer hover:shadow-sm transition-shadow"
@@ -1042,7 +1016,6 @@ export default function Dashboard() {
                 status: 'completed',
                 from: data.selection.start || undefined,
                 to: data.selection.end || undefined,
-                basis: incomeBasis,
               })
             }
             className="cursor-pointer hover:shadow-sm transition-shadow"
@@ -1072,8 +1045,6 @@ export default function Dashboard() {
             <CardTitle>Income Trend</CardTitle>
             <CardDescription>
               {data.selection.label}
-              {' • '}
-              {incomeBasis === 'completion' ? 'Count by completion date' : 'Count by job date'}
             </CardDescription>
           </CardHeader>
           <CardContent>
