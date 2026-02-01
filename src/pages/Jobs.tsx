@@ -89,6 +89,7 @@ export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSelectSearch, setCustomerSelectSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'date-new' | 'date-old' | 'price-high' | 'price-low' | 'customer'>('date-new');
@@ -206,6 +207,7 @@ export default function Jobs() {
         id: customer.id,
         name: customer.name,
       }));
+      mapped.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
       setCustomers(mapped);
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -586,13 +588,31 @@ export default function Jobs() {
                 <Select
                   value={formData.customer_id}
                   onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
+                  onOpenChange={(open) => {
+                    if (!open) setCustomerSelectSearch('');
+                  }}
                   required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.map(customer => (
+                    <div className="p-2">
+                      <Input
+                        placeholder="Search customers..."
+                        value={customerSelectSearch}
+                        onChange={(e) => setCustomerSelectSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') e.preventDefault();
+                        }}
+                      />
+                    </div>
+                    {customers
+                      .filter((customer) =>
+                        (customer.name || '').toLowerCase().includes(customerSelectSearch.toLowerCase())
+                      )
+                      .map(customer => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
                       </SelectItem>

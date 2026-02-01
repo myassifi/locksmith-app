@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { api } from '@/integrations/api/client';
 
@@ -48,6 +49,18 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
+  const [creatingNewItem, setCreatingNewItem] = useState(false);
+  const [newItemData, setNewItemData] = useState({
+    itemName: '',
+    sku: '',
+    keyType: '',
+    make: '',
+    module: '',
+    fccId: '',
+    quantity: '1',
+    cost: '',
+  });
 
   useEffect(() => {
     loadInventory();
@@ -138,6 +151,86 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
     item.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleCreateNewItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const safeName = (newItemData.itemName || newItemData.sku).trim();
+    if (!safeName) {
+      toast({
+        title: 'Missing name',
+        description: 'Please enter an item name (or at least a SKU).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const quantity = parseInt(newItemData.quantity || '0', 10);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      toast({
+        title: 'Invalid quantity',
+        description: 'Quantity must be at least 1 so it can be used on this job.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreatingNewItem(true);
+    try {
+      const created = await api.createInventoryItem({
+        itemName: safeName,
+        sku: newItemData.sku.trim() || null,
+        keyType: newItemData.keyType.trim() || null,
+        make: newItemData.make.trim() || null,
+        module: newItemData.module.trim() || null,
+        fccId: newItemData.fccId.trim() || null,
+        quantity,
+        cost: newItemData.cost ? parseFloat(newItemData.cost) : 0,
+      });
+
+      const createdForSelector: InventoryItem = {
+        id: created.id,
+        item_name: created.item_name || created.itemName || created.sku || '',
+        sku: created.sku || '',
+        key_type: created.key_type || created.keyType || '',
+        quantity: created.quantity ?? 0,
+        cost: created.cost ?? 0,
+        category: created.category || '',
+        make: created.make || '',
+        module: created.module || '',
+        fcc_id: created.fcc_id || created.fccId || '',
+      };
+
+      await loadInventory();
+      addInventoryItem(createdForSelector);
+
+      setNewItemDialogOpen(false);
+      setNewItemData({
+        itemName: '',
+        sku: '',
+        keyType: '',
+        make: '',
+        module: '',
+        fccId: '',
+        quantity: '1',
+        cost: '',
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Material added to inventory and added to this job.',
+      });
+    } catch (error) {
+      console.error('Error creating inventory item:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create inventory item',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingNewItem(false);
+    }
+  };
+
   const totalMaterialCost = selectedItems.reduce((sum, item) => sum + (item.total_cost || 0), 0);
 
   return (
@@ -160,11 +253,132 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
             </DialogHeader>
             
             <div className="flex-1 overflow-hidden flex flex-col space-y-4">
-              <Input
-                placeholder="Search inventory..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Search inventory..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+                <Dialog open={newItemDialogOpen} onOpenChange={setNewItemDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      New Item
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Add New Material</DialogTitle>
+                    </DialogHeader>
+
+                    <form onSubmit={handleCreateNewItem} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new_item_name">Item Name *</Label>
+                        <Input
+                          id="new_item_name"
+                          value={newItemData.itemName}
+                          onChange={(e) => setNewItemData((p) => ({ ...p, itemName: e.target.value }))}
+                          placeholder="e.g., Toyota Smart Key"
+                          required={false}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_sku">SKU</Label>
+                          <Input
+                            id="new_item_sku"
+                            value={newItemData.sku}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, sku: e.target.value }))}
+                            placeholder="SKU"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_key_type">Key Type</Label>
+                          <Input
+                            id="new_item_key_type"
+                            value={newItemData.keyType}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, keyType: e.target.value }))}
+                            placeholder="Prox / Smart"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_make">Make</Label>
+                          <Input
+                            id="new_item_make"
+                            value={newItemData.make}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, make: e.target.value }))}
+                            placeholder="Toyota"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_module">Module</Label>
+                          <Input
+                            id="new_item_module"
+                            value={newItemData.module}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, module: e.target.value }))}
+                            placeholder="(optional)"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="new_item_fcc">FCC ID</Label>
+                        <Input
+                          id="new_item_fcc"
+                          value={newItemData.fccId}
+                          onChange={(e) => setNewItemData((p) => ({ ...p, fccId: e.target.value }))}
+                          placeholder="FCC ID"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_qty">Quantity *</Label>
+                          <Input
+                            id="new_item_qty"
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            value={newItemData.quantity}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, quantity: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new_item_cost">Cost</Label>
+                          <Input
+                            id="new_item_cost"
+                            type="number"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={newItemData.cost}
+                            onChange={(e) => setNewItemData((p) => ({ ...p, cost: e.target.value }))}
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1" disabled={creatingNewItem}>
+                          {creatingNewItem ? 'Saving...' : 'Save & Add'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setNewItemDialogOpen(false)}
+                          disabled={creatingNewItem}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
               
               <div className="flex-1 overflow-y-auto space-y-2">
                 {loading ? (
