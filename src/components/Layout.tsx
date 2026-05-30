@@ -5,9 +5,12 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { Button } from '@/components/ui/button';
-import { LogOut, Flame, Menu, Sun, Moon, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { LogOut, Flame, Menu, Sun, Moon, RefreshCw, Bell } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { api } from '@/integrations/api/client';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,7 +24,25 @@ export function Layout({ children }: LayoutProps) {
   const { signOut, user } = useAuth();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
+
+  const todayStr = new Date().toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  const { data: alertCount = 0 } = useQuery({
+    queryKey: ['inventory-alerts'],
+    queryFn: async () => {
+      const items = await api.getInventory();
+      return (items || []).filter(
+        (i: any) => i.quantity === 0 || i.quantity <= (i.low_stock_threshold || 3)
+      ).length;
+    },
+    staleTime: 60_000,
+  });
 
   const handleSignOut = async () => {
     try {
@@ -62,7 +83,7 @@ export function Layout({ children }: LayoutProps) {
               </SidebarTrigger>
               
               <div className="flex items-center gap-2 min-w-0 lg:hidden">
-                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 fill-orange-500 flex-shrink-0" />
+                <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-primary fill-primary flex-shrink-0" />
                 <div className="min-w-0">
                   <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">
                     <span className="hidden sm:inline">Heat Wave Locksmith</span>
@@ -76,6 +97,24 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
+              <span className="hidden lg:inline text-sm font-medium text-muted-foreground">
+                {todayStr}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/inventory')}
+                className="rounded-full relative"
+                title={alertCount > 0 ? `${alertCount} item(s) need attention` : 'No inventory alerts'}
+              >
+                <Bell className="h-5 w-5" />
+                {alertCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px]">
+                    {alertCount > 99 ? '99+' : alertCount}
+                  </Badge>
+                )}
+                <span className="sr-only">Inventory alerts</span>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy, Sparkles } from 'lucide-react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy, Sparkles, MoreHorizontal } from 'lucide-react';
 import InvoiceUpload from '@/components/invoice/InvoiceUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -38,7 +39,6 @@ interface InventoryItem {
   low_stock_threshold?: number;
   year_from?: number;
   year_to?: number;
-  image_url?: string;
   created_at?: string;
 }
 
@@ -175,12 +175,13 @@ export default function InventoryNew() {
   });
   const [searchSuggestions, setSearchSuggestions] = useState<InventoryItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importingPreset, setImportingPreset] = useState(false);
   const [cleanDialogOpen, setCleanDialogOpen] = useState(false);
   const [cleaningData, setCleaningData] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -206,7 +207,6 @@ export default function InventoryNew() {
     year_to: '',
     fcc_id: '',
     low_stock_threshold: '3',
-    image_url: '',
   });
 
   // Auto-generate item name
@@ -304,7 +304,6 @@ export default function InventoryNew() {
         year_from: item.yearFrom ?? undefined,
         year_to: item.yearTo ?? undefined,
         created_at: item.createdAt,
-        image_url: item.imageUrl || '',
       }));
       setInventory(mapped);
     } catch (error) {
@@ -606,7 +605,6 @@ export default function InventoryNew() {
       year_to: item.year_to?.toString() || '',
       fcc_id: item.fcc_id || '',
       low_stock_threshold: (item.low_stock_threshold || 3).toString(),
-      image_url: item.image_url || '',
     });
     setDialogOpen(true);
   };
@@ -629,41 +627,6 @@ export default function InventoryNew() {
         description: "Failed to delete item",
         variant: "destructive"
       });
-    }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file size (e.g., max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Error",
-        description: "Image size must be less than 5MB",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      const { url } = await api.uploadImage(file);
-      setFormData(prev => ({ ...prev, image_url: url }));
-      toast({
-        title: "Success",
-        description: "Image uploaded successfully",
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload image';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingImage(false);
     }
   };
 
@@ -698,7 +661,6 @@ export default function InventoryNew() {
         yearTo: formData.year_to ? parseInt(formData.year_to) : null,
         fccId: formData.fcc_id || null,
         lowStockThreshold: parseInt(formData.low_stock_threshold),
-        imageUrl: formData.image_url || null,
       };
 
       if (editingItem) {
@@ -743,7 +705,6 @@ export default function InventoryNew() {
       year_to: '',
       fcc_id: '',
       low_stock_threshold: '3',
-      image_url: '',
     });
   };
 
@@ -965,7 +926,6 @@ export default function InventoryNew() {
             yearTo: null,
             fccId: null,
             lowStockThreshold: 3,
-            imageUrl: null,
           });
           createdCount += 1;
         }
@@ -1069,39 +1029,58 @@ export default function InventoryNew() {
             </>
           ) : (
             <>
-              <Button
-                variant={bulkEditMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setBulkEditMode(!bulkEditMode);
-                  setSelectedItems([]);
-                }}
-                className="gap-2 touch-target"
-              >
-                <Package className="h-4 w-4" />
-                <span className="hidden sm:inline">Bulk Edit</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportToCSV}
-                className="gap-2 touch-target"
-                disabled={inventory.length === 0}
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCleanDialogOpen(true)}
-                className="gap-2 touch-target"
-                disabled={inventory.length === 0}
-              >
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Clean Data</span>
-              </Button>
-              <InvoiceUpload onComplete={loadInventory} />
+              <Popover open={moreActionsOpen} onOpenChange={setMoreActionsOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2 touch-target">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="hidden sm:inline">More Actions</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-56 p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setBulkEditMode(!bulkEditMode);
+                      setSelectedItems([]);
+                      setMoreActionsOpen(false);
+                    }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    Bulk Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { exportToCSV(); setMoreActionsOpen(false); }}
+                    className="w-full justify-start gap-2"
+                    disabled={inventory.length === 0}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setCleanDialogOpen(true); setMoreActionsOpen(false); }}
+                    className="w-full justify-start gap-2"
+                    disabled={inventory.length === 0}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Clean Data
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setInvoiceOpen(true); setMoreActionsOpen(false); }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <FileUp className="h-4 w-4" />
+                    Import Invoice
+                  </Button>
+                </PopoverContent>
+              </Popover>
               <InventoryFilters
                 filters={filters}
                 onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
@@ -1114,6 +1093,7 @@ export default function InventoryNew() {
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Add Item</span>
               </Button>
+              <InvoiceUpload onComplete={loadInventory} open={invoiceOpen} onOpenChange={setInvoiceOpen} hideTrigger />
             </>
           )}
         </>
@@ -1125,7 +1105,7 @@ export default function InventoryNew() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
+                <Package className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{inventoryStats.totalItems}</div>
@@ -1136,7 +1116,7 @@ export default function InventoryNew() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-600" />
+                <DollarSign className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">${inventoryStats.totalValue.toFixed(0)}</div>
@@ -1449,7 +1429,7 @@ export default function InventoryNew() {
               </TabsTrigger>
               <TabsTrigger value="reorder" className="gap-2 whitespace-nowrap shrink-0">
                 <ShoppingCart className="h-3 w-3" />
-                Reorder <Badge variant="secondary" className="ml-1 shrink-0 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-400">{stats.reorder}</Badge>
+                Reorder <Badge variant="secondary" className="ml-1 shrink-0 bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">{stats.reorder}</Badge>
               </TabsTrigger>
               <TabsTrigger value="low" className="gap-2 whitespace-nowrap shrink-0">
                 Low <Badge variant="secondary" className="ml-1 shrink-0 bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">{stats.low}</Badge>
@@ -1458,7 +1438,7 @@ export default function InventoryNew() {
                 Out <Badge variant="destructive" className="ml-1 shrink-0">{stats.out}</Badge>
               </TabsTrigger>
               <TabsTrigger value="in-stock" className="gap-2 whitespace-nowrap shrink-0">
-                In Stock <Badge variant="secondary" className="ml-1 shrink-0">{stats.inStock}</Badge>
+                In Stock <Badge variant="secondary" className="ml-1 shrink-0 bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-400">{stats.inStock}</Badge>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1614,14 +1594,17 @@ export default function InventoryNew() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b sm:px-6">
+            <DialogTitle className="text-xl">{editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
+            <DialogDescription>
+              Enter vehicle fitment, key identifiers, stock count, and supplier details in one organized workflow.
+            </DialogDescription>
           </DialogHeader>
           
           {/* Duplicate Warning Banner */}
           {!editingItem && duplicateItem && (
-            <Alert variant="destructive" className="animate-in slide-in-from-top">
+            <Alert variant="destructive" className="mx-5 mt-5 animate-in slide-in-from-top sm:mx-6">
               <AlertTriangle className="h-5 w-5" />
               <div className="flex-1">
                 <AlertTitle>Duplicate {duplicateField === 'sku' ? 'SKU' : 'FCC ID'} Detected!</AlertTitle>
@@ -1646,57 +1629,13 @@ export default function InventoryNew() {
             </Alert>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-6">
-              {/* Section 0: Image Upload */}
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                <h3 className="font-medium flex items-center gap-2 text-primary">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">1</div>
-                  Item Image
-                </h3>
-                <div className="flex items-center gap-4">
-                  {formData.image_url && (
-                    <div className="relative h-24 w-24 rounded-lg overflow-hidden border">
-                      <img 
-                        src={formData.image_url} 
-                        alt="Preview" 
-                        className="h-full w-full object-cover" 
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-0 right-0 h-6 w-6 rounded-none rounded-bl-lg"
-                        onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <Label htmlFor="image-upload">Upload Image</Label>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={uploadingImage}
-                      />
-                      {uploadingImage && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Supported formats: JPG, PNG, GIF. Max size: 5MB.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
+          <form onSubmit={handleSubmit} className="space-y-0">
+            <div className="grid gap-5 px-5 py-5 sm:px-6">
               {/* Section 1: Vehicle Information */}
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                <h3 className="font-medium flex items-center gap-2 text-primary">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">2</div>
-                  Vehicle Compatibility
+              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+                <h3 className="font-medium flex items-center gap-2 text-foreground">
+                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">1</div>
+                  <span className="text-primary">Vehicle Compatibility</span>
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -1763,10 +1702,10 @@ export default function InventoryNew() {
               </div>
 
               {/* Section 2: Key Details */}
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                <h3 className="font-medium flex items-center gap-2 text-primary">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">2</div>
-                  Key Details
+              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+                <h3 className="font-medium flex items-center gap-2 text-foreground">
+                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">2</div>
+                  <span className="text-primary">Key Details</span>
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -1810,10 +1749,10 @@ export default function InventoryNew() {
               </div>
 
               {/* Section 3: Inventory Information */}
-              <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                <h3 className="font-medium flex items-center gap-2 text-primary">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">3</div>
-                  Stock & Pricing
+              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+                <h3 className="font-medium flex items-center gap-2 text-foreground">
+                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">3</div>
+                  <span className="text-primary">Stock & Pricing</span>
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -1847,7 +1786,7 @@ export default function InventoryNew() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <Label>Quantity *</Label>
                     <Input
@@ -1881,12 +1820,12 @@ export default function InventoryNew() {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="sticky bottom-0 flex gap-3 border-t bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 touch-target">
+                Cancel
+              </Button>
               <Button type="submit" className="flex-1 touch-target">
                 {editingItem ? 'Update Item' : 'Add Item'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="touch-target">
-                Cancel
               </Button>
             </div>
           </form>

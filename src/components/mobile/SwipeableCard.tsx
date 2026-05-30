@@ -21,7 +21,6 @@ interface InventoryItem {
   low_stock_threshold?: number;
   year_from?: number;
   year_to?: number;
-  image_url?: string;
   created_at?: string;
 }
 
@@ -42,21 +41,6 @@ export function SwipeableInventoryCard({ item, showReorderNeed, onQuantityChange
     <Card className="relative overflow-hidden mb-3">
       <CardContent className="p-4">
         <div className="flex gap-3">
-          {/* Image Thumbnail */}
-          <div className="h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted border">
-            {item.image_url ? (
-              <img 
-                src={item.image_url} 
-                alt={item.item_name} 
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground bg-muted/50">
-                No img
-              </div>
-            )}
-          </div>
-
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start mb-1">

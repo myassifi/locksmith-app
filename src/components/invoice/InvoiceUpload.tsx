@@ -27,15 +27,24 @@ interface InvoiceItem {
 
 interface InvoiceUploadProps {
   onComplete: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
-export default function InvoiceUpload({ onComplete }: InvoiceUploadProps) {
+export default function InvoiceUpload({ onComplete, open: controlledOpen, onOpenChange, hideTrigger }: InvoiceUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [parsedItems, setParsedItems] = useState<InvoiceItem[]>([]);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'upload' | 'review' | 'success'>('upload');
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const isOpen = isControlled ? controlledOpen : internalOpen;
+  const setIsOpen = (open: boolean) => {
+    if (!isControlled) setInternalOpen(open);
+    onOpenChange?.(open);
+  };
   const [importingItems, setImportingItems] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,15 +125,17 @@ export default function InvoiceUpload({ onComplete }: InvoiceUploadProps) {
 
   return (
     <>
-      <Button 
-        variant="outline"
-        size="sm"
-        onClick={() => setIsOpen(true)}
-        className="gap-2 touch-target"
-      >
-        <FileUp className="h-4 w-4" />
-        <span className="hidden sm:inline">Import Invoice</span>
-      </Button>
+      {!hideTrigger && (
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={() => setIsOpen(true)}
+          className="gap-2 touch-target"
+        >
+          <FileUp className="h-4 w-4" />
+          <span className="hidden sm:inline">Import Invoice</span>
+        </Button>
+      )}
 
       <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open) {

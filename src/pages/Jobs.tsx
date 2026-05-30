@@ -340,17 +340,17 @@ export default function Jobs() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': 
-        return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-green-100 text-green-700 border border-green-200 font-medium dark:bg-green-500/15 dark:text-green-400 dark:border-green-500/30';
       case 'in_progress': 
-        return 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-blue-100 text-blue-700 border border-blue-200 font-medium dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30';
       case 'paid': 
-        return 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-violet-100 text-violet-700 border border-violet-200 font-medium dark:bg-violet-500/15 dark:text-violet-400 dark:border-violet-500/30';
       case 'pending':
-        return 'bg-gradient-to-r from-orange-500 to-amber-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-amber-100 text-amber-700 border border-amber-200 font-medium dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30';
       case 'cancelled':
-        return 'bg-gradient-to-r from-red-500 to-rose-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-red-100 text-red-700 border border-red-200 font-medium dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/30';
       default: 
-        return 'bg-gradient-to-r from-gray-500 to-slate-600 text-white border-0 shadow-md font-semibold';
+        return 'bg-slate-100 text-slate-700 border border-slate-200 font-medium dark:bg-slate-500/15 dark:text-slate-300 dark:border-slate-500/30';
     }
   };
 
@@ -993,7 +993,8 @@ export default function Jobs() {
                           setSelectedJobForReceipt(job);
                           setReceiptDialogOpen(true);
                         }}
-                        className="h-11 sm:h-8 text-sm sm:text-xs gap-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                        variant="outline"
+                        className="h-11 sm:h-8 text-sm sm:text-xs gap-1 transition-colors"
                         title="Send Receipt"
                       >
                         📧 <span className="hidden sm:inline">Receipt</span>

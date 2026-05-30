@@ -1,0 +1,72 @@
+# Inventory Items to Add
+
+## Item 1
+- SKU: CR-KDY-ZB33-4
+- Name: KeyDiy KD Universal Smart Remote Key 4 Button Hyundai Style ZB33-4
+- Type: Remote
+- Quantity: 1
+- Cost: $23.95
+- Supplier: KeyDiy
+- Category: Remotes
+- Make: Hyundai
+- FCC ID: ZB33-4
+- Low Stock Threshold: 3
+
+## Item 2
+- SKU: CR-XHS-XKTO02EN
+- Name: Xhorse Wire Remote Key Toyota Style Triangle 4 Buttons XKTO02EN
+- Type: Remote
+- Quantity: 2
+- Cost: $9.45
+- Supplier: Xhorse
+- Category: Remotes
+- Make: Toyota
+- FCC ID: XKTO02EN
+- Low Stock Threshold: 3
+
+## Item 3
+- SKU: CR-AUT-IKEYTY8A4TP
+- Name: Autel iKey Universal Smart Key Toyota Style 8A-chipped 4 Button IKEYTY8A4TP
+- Type: Smart Key
+- Quantity: 3
+- Cost: $28.50
+- Supplier: Autel
+- Category: Prox / Smart Keys
+- Make: Toyota
+- Module: 8A-chipped
+- FCC ID: IKEYTY8A4TP
+- Low Stock Threshold: 3
+
+## Item 4
+- SKU: CR-AUT-CR5TPR
+- Name: Autel iKey Universal Smart Key Chrysler Premium Style 5 Button IKEYCR5TPR
+- Type: Smart Key
+- Quantity: 2
+- Cost: $17.99
+- Supplier: Autel
+- Category: Prox / Smart Keys
+- Make: Chrysler
+- Model: Premium
+- FCC ID: IKEYCR5TPR
+- Low Stock Threshold: 3
+
+## Item 5
+- SKU: KB-UNV-TOY41R
+- Name: Flip Remote Blade For Toyota TOY41R
+- Type: Blade
+- Quantity: 11
+- Cost: $0.55
+- Category: Emergency Blades
+- Make: Toyota
+- FCC ID: TOY41R
+- Low Stock Threshold: 5
+
+## Item 6
+- SKU: TOOL-FLPTS
+- Name: 6-in-1 Foldable Lock Pick Tool Set - Compact Multi-Pick Design for Locksmiths
+- Type: Tool
+- Quantity: 1
+- Cost: $0.00
+- Category: Other / Tools / Accessories
+- Model: Foldable Lock Pick
+- Low Stock Threshold: 1

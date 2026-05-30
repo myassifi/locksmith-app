@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, ShoppingCart } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 
 interface InventoryItem {
@@ -21,7 +21,6 @@ interface InventoryItem {
   low_stock_threshold?: number;
   year_from?: number;
   year_to?: number;
-  image_url?: string;
   created_at?: string;
 }
 
@@ -41,37 +40,24 @@ export function InventoryGridCard({ item, showReorderNeed, onEdit, onDelete }: I
   return (
     <Card className="group relative overflow-hidden hover:shadow-lg transition-shadow duration-200">
       <CardContent className="p-0">
-        {/* Image Section */}
-        <div className="relative aspect-square bg-muted/30 overflow-hidden">
-          {item.image_url ? (
-            <img 
-              src={item.image_url} 
-              alt={item.item_name || item.sku} 
-              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
-            />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-              <ShoppingCart className="h-16 w-16 opacity-20" />
-            </div>
-          )}
-          
+        <div className="relative border-b bg-muted/20 p-4">
           {/* Stock Badge */}
           {isOutOfStock ? (
             <Badge variant="destructive" className="absolute top-2 right-2">
               Out of Stock
             </Badge>
           ) : isLowStock ? (
-            <Badge variant="destructive" className="absolute top-2 right-2">
+            <Badge variant="outline" className="absolute top-2 right-2 bg-amber-500 text-white border-transparent">
               Low Stock
             </Badge>
           ) : null}
 
           {/* Quick Actions - Show on hover */}
-          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+          <div className="flex gap-1">
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 bg-white/90 hover:bg-white"
+              className="h-8 w-8"
               onClick={() => onEdit(item)}
             >
               <Edit className="h-4 w-4" />
@@ -79,7 +65,7 @@ export function InventoryGridCard({ item, showReorderNeed, onEdit, onDelete }: I
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 bg-white/90 hover:bg-white hover:text-destructive"
+              className="h-8 w-8 hover:text-destructive"
               onClick={() => onDelete(item.id)}
             >
               <Trash2 className="h-4 w-4" />

@@ -20,7 +20,6 @@ interface InventoryItem {
   low_stock_threshold?: number;
   year_from?: number;
   year_to?: number;
-  image_url?: string;
   created_at?: string;
 }
 
@@ -38,7 +37,6 @@ export function InventoryDataTable({ data, showReorderNeed, onQuantityChange, on
       <table className="w-full">
         <thead>
           <tr className="border-b bg-muted/50">
-            <th className="p-3 text-left text-sm font-medium w-[60px]">Image</th>
             <th className="p-3 text-left text-sm font-medium">Item Name</th>
             <th className="p-3 text-left text-sm font-medium">SKU</th>
             <th className="p-3 text-left text-sm font-medium">Make</th>
@@ -60,24 +58,13 @@ export function InventoryDataTable({ data, showReorderNeed, onQuantityChange, on
             return (
               <tr key={item.id} className="border-b hover:bg-muted/50">
                 <td className="p-3">
-                  <div className="h-10 w-10 rounded-md overflow-hidden bg-muted flex items-center justify-center border">
-                    {item.image_url ? (
-                      <img 
-                        src={item.image_url} 
-                        alt={item.item_name} 
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-xs text-muted-foreground">No img</div>
-                    )}
-                  </div>
-                </td>
-                <td className="p-3">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{item.item_name}</span>
-                    {isLowStock && (
-                      <Badge variant="destructive" className="text-xs">Low Stock</Badge>
-                    )}
+                    {item.quantity === 0 ? (
+                      <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
+                    ) : isLowStock ? (
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-400">Low Stock</Badge>
+                    ) : null}
                   </div>
                 </td>
                 <td className="p-3 text-sm text-muted-foreground">{item.sku || '-'}</td>
