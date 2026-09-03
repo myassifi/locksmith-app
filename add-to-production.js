@@ -115,9 +115,12 @@ if (!API_URL) {
 async function addItems() {
   console.log(`🔗 Connecting to: ${API_URL}\n`);
 
-  // Login with your production credentials
-  const email = 'm.yassifi@gmail.com';
-  const password = 'demo1234';
+  // Read credentials from the environment so secrets are never committed.
+  const email = process.env.OWNER_EMAIL;
+  const password = process.env.OWNER_PASSWORD;
+  if (!email || !password) {
+    throw new Error('Set OWNER_EMAIL and OWNER_PASSWORD before running this script');
+  }
 
   try {
     const loginResponse = await fetch(`${API_URL}/auth/login`, {
