@@ -29,10 +29,10 @@ export default function SignUp() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 12) {
       toast({
         title: "Password too short",
-        description: "Password must be at least 6 characters.",
+        description: "Password must be at least 12 characters.",
         variant: "destructive",
       });
       return;
@@ -123,7 +123,8 @@ export default function SignUp() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    placeholder="At least 6 characters"
+                    minLength={12}
+                    placeholder="At least 12 characters"
                   />
                 </div>
                 <div>
