@@ -15,6 +15,7 @@ const Inventory = lazy(() => import('./pages/Inventory'));
 const Actions = lazy(() => import('./pages/Actions'));
 const Settings = lazy(() => import('./pages/Settings'));
 import Login from "./pages/login";
+import SignUp from "./pages/signup";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUp />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/customers" element={<Customers />} />
