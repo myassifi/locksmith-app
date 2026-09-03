@@ -63,10 +63,12 @@ git push -u origin main
 2. Click "Variables" and add:
    ```
    DATABASE_URL = ${{Postgres.DATABASE_URL}}
-   JWT_SECRET = heatwave-secret-2024-abc123
-   CORS_ORIGIN = *
+   JWT_SECRET = YOUR_UNIQUE_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS
+   OWNER_EMAIL = YOUR_PRIVATE_LOGIN_EMAIL
+   CORS_ORIGIN = YOUR_FRONTEND_URL
    NODE_ENV = production
    ```
+   Generate `JWT_SECRET` locally with `openssl rand -base64 48`. Never reuse the example text or commit the generated value.
 3. Click "Settings":
    - Root Directory: `server`
    - Build Command: `npm run railway:build`
@@ -94,9 +96,7 @@ git push -u origin main
 
 ## ✅ Done!
 
-Open your frontend URL and login:
-- Email: `m.yassifi@gmail.com`
-- Password: `demo1234`
+Open your frontend URL and create the owner account using the email configured in `OWNER_EMAIL` and a unique password of at least 12 characters. After the account exists, use the same credentials to log in.
 
 ---
 
