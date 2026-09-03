@@ -8,8 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Flame, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-const OWNER_EMAIL = 'm.yassifi@gmail.com';
-
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,15 +17,6 @@ export default function Login() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
-      toast({
-        title: 'Not allowed',
-        description: `Only ${OWNER_EMAIL} can sign in to this app.`,
-        variant: 'destructive',
-      });
-      return;
-    }
 
     setLoading(true);
     
@@ -81,7 +70,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder={OWNER_EMAIL}
+                placeholder="owner@example.com"
               />
             </div>
             <div>
