@@ -2,6 +2,12 @@
 import fetch from 'node-fetch';
 
 const BACKEND_URL = 'https://locksmith-app-production.up.railway.app';
+const OWNER_EMAIL = process.env.OWNER_EMAIL;
+const OWNER_PASSWORD = process.env.OWNER_PASSWORD;
+
+if (!OWNER_EMAIL || !OWNER_PASSWORD) {
+  throw new Error('Set OWNER_EMAIL and OWNER_PASSWORD before running this script');
+}
 
 // Items from the receipt
 const items = [
@@ -101,14 +107,14 @@ function mapInventoryToApi(item) {
 // Function to login and get token
 async function login() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    const response = await fetch(`${BACKEND_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email: 'm.yassifi@gmail.com',
-        password: 'demo1234'
+        email: OWNER_EMAIL,
+        password: OWNER_PASSWORD
       })
     });
     
