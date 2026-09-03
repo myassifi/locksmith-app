@@ -104,10 +104,13 @@ git push -u origin main
    
    ```
    DATABASE_URL = ${{Postgres.DATABASE_URL}}
-   JWT_SECRET = heatwave-locksmith-railway-secret-2024-abc123xyz
-   CORS_ORIGIN = *
+   JWT_SECRET = YOUR_UNIQUE_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS
+   OWNER_EMAIL = YOUR_PRIVATE_LOGIN_EMAIL
+   CORS_ORIGIN = YOUR_FRONTEND_URL
    NODE_ENV = production
    ```
+
+   Generate `JWT_SECRET` locally with `openssl rand -base64 48`. Store the generated value only in Railway variables.
 
 4. **Configure Build Settings:**
    
@@ -180,10 +183,9 @@ Now that you have your frontend URL, update backend CORS:
 
 ### STEP 8: Test Your App!
 
-1. **Open your frontend URL** in browser
-2. **Login:**
-   - Email: `m.yassifi@gmail.com`
-   - Password: `demo1234`
+1. **Open your frontend URL** in browser.
+2. Create the owner account using the email configured in `OWNER_EMAIL` and a unique password of at least 12 characters.
+3. After the account exists, use the same credentials to log in.
 
 ✅ **Your app is live!**
 
