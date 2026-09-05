@@ -428,16 +428,15 @@ app.post('/api/jobs', authMiddleware, async (req: AuthRequest, res) => {
 app.put('/api/jobs/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { inventory, jobDate, ...jobData } = req.body;
-    // Delete existing job inventory relations
-    await prisma.jobInventory.deleteMany({ where: { jobId: req.params.id } });
-    // Update job and create new relations
+    // Nested writes are atomic: failed updates preserve the existing items.
     const job = await prisma.job.update({
       where: { id: req.params.id },
       data: {
         ...jobData,
         ...(jobDate ? { jobDate: new Date(jobDate) } : {}),
-        inventory: inventory?.length
+        inventory: inventory !== undefined
           ? {
+              deleteMany: {},
               create: inventory.map((inv: { inventoryItemId: string; quantityUsed: number }) => ({
                 inventoryItemId: inv.inventoryItemId,
                 quantityUsed: inv.quantityUsed || 1,

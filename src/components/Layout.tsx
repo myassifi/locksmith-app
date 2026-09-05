@@ -38,7 +38,7 @@ export function Layout({ children }: LayoutProps) {
     queryFn: async () => {
       const items = await api.getInventory();
       return (items || []).filter(
-        (i: any) => i.quantity === 0 || i.quantity <= (i.low_stock_threshold || 3)
+        (i: any) => i.quantity === 0 || i.quantity <= (i.low_stock_threshold ?? 3)
       ).length;
     },
     staleTime: 60_000,

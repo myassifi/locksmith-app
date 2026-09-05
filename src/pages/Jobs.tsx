@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ReceiptDialog } from '@/components/ReceiptDialog';
 import { Plus, Search, Edit, Trash2, Calendar, DollarSign, Phone, MapPin, Navigation, Package, TrendingUp, Target, Briefcase, Clock, CheckCircle, AlertCircle, ArrowUpDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ interface Job {
   customer_id: string;
   job_type: string;
   vehicle_lock_details?: string;
+  vehicle_year?: string;
   price: number;
   miles?: number;
   material_cost?: number;
@@ -86,6 +87,8 @@ const statusOptions = [
 export default function Jobs() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const saveRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -168,6 +171,14 @@ export default function Jobs() {
         customer_id: job.customerId,
         job_type: job.jobType,
         vehicle_lock_details: job.vehicleDetails || '',
+        vehicle_year: job.vehicleYear || '',
+        job_inventory: (job.inventory || []).map((link: { inventoryItemId: string; quantityUsed: number; inventoryItem?: { id: string; cost?: number; keyType: string; sku?: string; quantity: number } }) => ({
+          inventory_id: link.inventoryItemId,
+          quantity_used: link.quantityUsed,
+          unit_cost: link.inventoryItem?.cost ?? 0,
+          total_cost: (link.inventoryItem?.cost ?? 0) * link.quantityUsed,
+          inventory: link.inventoryItem ? { ...link.inventoryItem, key_type: link.inventoryItem.keyType, sku: link.inventoryItem.sku || '' } : undefined,
+        })),
         price: job.price ?? 0,
         miles: job.miles ?? 0,
         material_cost: job.materialCost ?? 0,
@@ -216,6 +227,7 @@ export default function Jobs() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saveRef.current) return;
     
     if (!user) {
       toast({
@@ -226,6 +238,8 @@ export default function Jobs() {
       return;
     }
     
+    saveRef.current = true;
+    setSaving(true);
     try {
       const materialCost = selectedInventory.reduce(
         (sum, item) => sum + (item.total_cost || 0),
@@ -274,6 +288,9 @@ export default function Jobs() {
         description: "Failed to save job",
         variant: "destructive",
       });
+    } finally {
+      saveRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -773,7 +790,7 @@ export default function Jobs() {
               </div>
 
               <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
+                <Button disabled={saving} type="submit" className="flex-1">
                   {editingJob ? 'Update' : 'Create'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
