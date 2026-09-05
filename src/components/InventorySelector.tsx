@@ -71,7 +71,6 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
     try {
       const data = await api.getInventory();
       const mapped: InventoryItem[] = (data || [])
-        .filter((item: any) => (item.quantity ?? 0) > 0)
         .sort((a: any, b: any) => (a.keyType || '').localeCompare(b.keyType || ''))
         .map((item: any) => ({
           id: item.id,
@@ -118,6 +117,7 @@ export function InventorySelector({ jobId, selectedItems, onItemsChange }: Inven
   };
 
   const updateQuantity = (inventoryId: string, newQuantity: number) => {
+    if (!Number.isInteger(newQuantity)) return;
     if (newQuantity <= 0) {
       removeItem(inventoryId);
       return;

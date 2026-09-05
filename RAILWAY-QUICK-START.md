@@ -1,3 +1,5 @@
+> Before deploying the stock workflow changes, follow [STOCK-WORKFLOW.md](STOCK-WORKFLOW.md), including the backup, secret, schema, and staging steps.
+
 # ⚡ Railway Quick Start - 5 Simple Steps
 
 **Get your app online in 15 minutes!**
@@ -96,7 +98,7 @@ git push -u origin main
 
 Open your frontend URL and login:
 - Email: `m.yassifi@gmail.com`
-- Password: `demo1234`
+- Password: your existing strong password. No default password is created.
 
 ---
 

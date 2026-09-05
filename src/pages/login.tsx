@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,18 +16,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
-      toast({
-        title: 'Not allowed',
-        description: `Only ${OWNER_EMAIL} can sign in to this app.`,
-        variant: 'destructive',
-      });
-      return;
-    }
 
     setLoading(true);
     
@@ -44,7 +36,8 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
-      navigate('/', { replace: true });
+      const from = location.state?.from;
+      navigate(typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && from !== '/login' ? from : '/', { replace: true });
     }
     setLoading(false);
   };

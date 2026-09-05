@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ interface InvoiceUploadProps {
 }
 
 export default function InvoiceUpload({ onComplete, open: controlledOpen, onOpenChange, hideTrigger }: InvoiceUploadProps) {
+  const importRef = useRef(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [parsedItems, setParsedItems] = useState<InvoiceItem[]>([]);
@@ -81,6 +82,8 @@ export default function InvoiceUpload({ onComplete, open: controlledOpen, onOpen
   };
 
   const handleConfirm = async () => {
+    if (importRef.current) return;
+    importRef.current = true;
     setImportingItems(true);
     
     try {
@@ -99,6 +102,7 @@ export default function InvoiceUpload({ onComplete, open: controlledOpen, onOpen
       setError(message);
       console.error('Import error:', err);
     } finally {
+      importRef.current = false;
       setImportingItems(false);
     }
   };
@@ -138,6 +142,7 @@ export default function InvoiceUpload({ onComplete, open: controlledOpen, onOpen
       )}
 
       <Dialog open={isOpen} onOpenChange={(open) => {
+        if (loading || importingItems) return;
         if (!open) {
           resetState();
         }

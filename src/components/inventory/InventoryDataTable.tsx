@@ -33,7 +33,7 @@ interface InventoryDataTableProps {
 
 export function InventoryDataTable({ data, showReorderNeed, onQuantityChange, onEdit, onDelete }: InventoryDataTableProps) {
   return (
-    <div className="rounded-md border">
+    <div className="rounded-xl border bg-card overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="border-b bg-muted/50">
@@ -52,9 +52,9 @@ export function InventoryDataTable({ data, showReorderNeed, onQuantityChange, on
         </thead>
         <tbody>
           {data.map((item) => {
-            const isLowStock = item.low_stock_threshold && item.quantity <= item.low_stock_threshold;
-            const threshold = item.low_stock_threshold || 3;
-            const reorderNeed = Math.max(0, threshold - item.quantity);
+            const isLowStock = item.quantity <= (item.low_stock_threshold ?? 3);
+            const threshold = item.low_stock_threshold ?? 3;
+            const reorderNeed = Math.max(0, threshold + 1 - item.quantity);
             return (
               <tr key={item.id} className="border-b hover:bg-muted/50">
                 <td className="p-3">

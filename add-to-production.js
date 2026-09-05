@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+if (!process.env.OWNER_EMAIL || !process.env.OWNER_PASSWORD) throw new Error('Set OWNER_EMAIL and OWNER_PASSWORD in the environment.');
 const items = [
   {
     itemName: "Original Lishi Chrysler Truck Anti Glare 2-in-1 Pick & Decoder 8-Cut CY24 / Y157 / Y159",
@@ -116,8 +118,8 @@ async function addItems() {
   console.log(`🔗 Connecting to: ${API_URL}\n`);
 
   // Login with your production credentials
-  const email = 'm.yassifi@gmail.com';
-  const password = 'demo1234';
+  const email = process.env.OWNER_EMAIL;
+  const password = process.env.OWNER_PASSWORD;
 
   try {
     const loginResponse = await fetch(`${API_URL}/auth/login`, {
@@ -150,7 +152,7 @@ async function addItems() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`, 'Idempotency-Key': randomUUID()
         },
         body: JSON.stringify(testItem)
       });
@@ -162,7 +164,7 @@ async function addItems() {
         const data = JSON.parse(responseText);
         await fetch(`${API_URL}/api/inventory/${data.id}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
         });
         console.log(`✓ Test item cleaned up.`);
       } else {
@@ -186,7 +188,7 @@ async function addItems() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`, 'Idempotency-Key': randomUUID()
           },
           body: JSON.stringify(item)
         });
