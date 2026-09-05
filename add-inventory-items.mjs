@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+if (!process.env.OWNER_EMAIL || !process.env.OWNER_PASSWORD) throw new Error('Set OWNER_EMAIL and OWNER_PASSWORD in the environment.');
 // ES Module script to add inventory items
 import fetch from 'node-fetch';
 
@@ -101,14 +103,14 @@ function mapInventoryToApi(item) {
 // Function to login and get token
 async function login() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    const response = await fetch(`${BACKEND_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email: 'm.yassifi@gmail.com',
-        password: 'demo1234'
+        email: process.env.OWNER_EMAIL,
+        password: process.env.OWNER_PASSWORD
       })
     });
     
@@ -131,7 +133,7 @@ async function addInventoryItem(item, token) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`, 'Idempotency-Key': randomUUID()
       },
       body: JSON.stringify(mapInventoryToApi(item))
     });

@@ -18,3 +18,7 @@ server/uploads
 
 # Don't commit bun.lockb if using npm
 bun.lockb
+
+# Local verification artifacts
+server/work/
+preview-local.mjs

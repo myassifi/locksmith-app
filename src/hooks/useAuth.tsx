@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, AUTH_TOKEN_EVENT } from '@/integrations/api/client';
 
 export interface AuthUser {
@@ -9,135 +10,62 @@ export interface AuthUser {
   address?: string | null;
   createdAt?: string | null;
 }
-
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, businessName?: string) => Promise<{ error: any }>;
+  sessionError: string | null;
+  retrySession: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: unknown }>;
+  signUp: (email: string, password: string, businessName?: string) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const handler = async (event: Event) => {
-      const token = (event as CustomEvent<{ token: string | null }>).detail?.token;
-
-      if (!token) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const me = await api.getMe();
-        setUser({
-          id: me.id,
-          email: me.email,
-          businessName: me.businessName,
-          phone: me.phone,
-          address: me.address,
-          createdAt: me.createdAt,
-        });
-      } catch {
-        api.logout();
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    window.addEventListener(AUTH_TOKEN_EVENT, handler as EventListener);
-    return () => window.removeEventListener(AUTH_TOKEN_EVENT, handler as EventListener);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const queries = useQueryClient();
+  const retrySession = useCallback(async () => {
+    const revision = ++generation.current;
+    const token = api.getToken();
+    setSessionError(null);
+    if (!token) { setUser(null); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const me = await api.getMe();
+      if (revision === generation.current && api.getToken() === token) setUser(me);
+    } catch {
+      if (revision === generation.current && api.getToken() === token) setSessionError('Unable to reach the server. Your session is saved. Try again when your connection returns.');
+    } finally { if (revision === generation.current) setLoading(false); }
   }, []);
-
-  // On mount, try to load user from existing token
   useEffect(() => {
-    const init = async () => {
-      try {
-        const me = await api.getMe();
-        setUser({
-          id: me.id,
-          email: me.email,
-          businessName: me.businessName,
-          phone: me.phone,
-          address: me.address,
-          createdAt: me.createdAt,
-        });
-      } catch (error) {
-        // If fetching the current user fails, clear any token and continue unauthenticated
-        api.logout();
-      } finally {
-        setLoading(false);
-      }
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ token: string | null; user?: AuthUser }>).detail;
+      ++generation.current;
+      queries.clear();
+      setSessionError(null);
+      if (!detail.token) { setUser(null); setLoading(false); }
+      else if (detail.user) { setUser(detail.user); setLoading(false); }
+      else { setUser(null); void retrySession(); }
     };
-    void init();
-  }, []);
-
+    window.addEventListener(AUTH_TOKEN_EVENT, handler);
+    void retrySession();
+    return () => { ++generation.current; window.removeEventListener(AUTH_TOKEN_EVENT, handler); };
+  }, [retrySession, queries]);
   const signIn = async (email: string, password: string) => {
-    try {
-      const { user } = await api.login(email, password);
-      setUser({
-        id: user.id,
-        email: user.email,
-        businessName: user.businessName,
-        phone: user.phone,
-        address: user.address,
-        createdAt: user.createdAt,
-      });
-      return { error: null };
-    } catch (error) {
-      return { error };
-    }
+    try { await api.login(email.trim().toLowerCase(), password); return { error: null }; }
+    catch (error) { return { error }; }
   };
-
   const signUp = async (email: string, password: string, businessName?: string) => {
-    try {
-      const { user } = await api.signup(email, password, businessName);
-      setUser({
-        id: user.id,
-        email: user.email,
-        businessName: user.businessName,
-        phone: user.phone,
-        address: user.address,
-        createdAt: user.createdAt,
-      });
-      return { error: null };
-    } catch (error) {
-      return { error };
-    }
+    try { await api.signup(email, password, businessName); return { error: null }; }
+    catch (error) { return { error }; }
   };
-
-  const signOut = async () => {
-    api.logout();
-    setUser(null);
-  };
-
-  const value = {
-    user,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const signOut = async () => { ++generation.current; api.logout(); queries.clear(); setUser(null); setSessionError(null); setLoading(false); };
+  return <AuthContext.Provider value={{ user, loading, sessionError, retrySession, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
 }
-
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

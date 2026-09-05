@@ -73,7 +73,6 @@ export default function Settings() {
       setSaving(true);
       await api.updateProfile({ businessName });
       toast({ title: 'Saved', description: 'Business name updated.' });
-      window.location.reload();
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to update business name', variant: 'destructive' });
     } finally {
@@ -90,7 +89,6 @@ export default function Settings() {
         address: businessAddress,
       });
       toast({ title: 'Saved', description: 'Business profile updated successfully.' });
-      window.location.reload();
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to update profile', variant: 'destructive' });
     } finally {
@@ -118,8 +116,8 @@ export default function Settings() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast({ title: 'Error', description: 'Password must be at least 6 characters', variant: 'destructive' });
+    if (newPassword.length < 12 || new TextEncoder().encode(newPassword).length > 72) {
+      toast({ title: 'Error', description: 'Use at least 12 characters and at most 72 bytes', variant: 'destructive' });
       return;
     }
 

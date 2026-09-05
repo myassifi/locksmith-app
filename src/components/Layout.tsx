@@ -10,6 +10,7 @@ import { LogOut, Flame, Menu, Sun, Moon, RefreshCw, Bell } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useInventorySocket } from '@/hooks/useSocket';
 import { api } from '@/integrations/api/client';
 
 interface LayoutProps {
@@ -44,11 +45,13 @@ export function Layout({ children }: LayoutProps) {
     staleTime: 60_000,
   });
 
+  useInventorySocket(() => { void queryClient.invalidateQueries({ queryKey: ['inventory-alerts'] }); });
+
   const handleSignOut = async () => {
     try {
       await signOut();
       // Force a full page reload to clear all state
-      window.location.replace('/login');
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Sign out error:', error);
     }

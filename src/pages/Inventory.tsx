@@ -24,6 +24,7 @@ import { InventoryFilters } from '@/components/inventory/InventoryFilters';
 
 interface InventoryItem {
   id: string;
+  version: number;
   item_name?: string;
   sku: string;
   key_type: string;
@@ -170,6 +171,8 @@ export default function InventoryNew() {
   const [duplicateField, setDuplicateField] = useState<'sku' | 'fcc_id' | null>(null);
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const bulkSavingRef = useRef(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({
     quantity: '',
@@ -284,6 +287,7 @@ export default function InventoryNew() {
       if (requestId !== requestRef.current) return;
       const mapped: InventoryItem[] = (data || []).map((item: any) => ({
         id: item.id,
+        version: item.version,
         item_name: item.itemName || item.sku || '',
         sku: item.sku || '',
         key_type: item.keyType || '',
@@ -616,7 +620,7 @@ export default function InventoryNew() {
       console.error('Delete error:', error);
       toast({
         title: "Error",
-        description: "Failed to delete item",
+        description: error instanceof Error ? error.message : "Failed to delete item",
         variant: "destructive"
       });
     }
@@ -652,6 +656,7 @@ export default function InventoryNew() {
 
     try {
       const itemData = {
+        ...(editingItem ? { expectedVersion: editingItem.version } : {}),
         itemName: formData.item_name || formData.sku,
         sku: formData.sku,
         keyType: formData.key_type || null,
@@ -683,7 +688,7 @@ export default function InventoryNew() {
       console.error('Save error:', error);
       toast({
         title: "Error",
-        description: "Failed to save item",
+        description: error instanceof Error ? error.message : "Failed to save item",
         variant: "destructive",
       });
     } finally {
@@ -778,55 +783,19 @@ export default function InventoryNew() {
   };
 
   const handleBulkUpdate = async () => {
-    if (selectedItems.length === 0) return;
-
+    if (selectedItems.length === 0 || bulkSavingRef.current) return;
+    bulkSavingRef.current = true;
+    setBulkSaving(true);
     try {
-      const updates = selectedItems.map(async (id) => {
-        const item = inventory.find(i => i.id === id);
-        if (!item) return;
-
-        const updateData: any = {};
-
-        // Handle quantity update
-        if (bulkEditData.quantity) {
-          const qty = parseInt(bulkEditData.quantity);
-          if (bulkEditData.action === 'add') {
-            updateData.quantity = item.quantity + qty;
-          } else if (bulkEditData.action === 'subtract') {
-            updateData.quantity = Math.max(0, item.quantity - qty);
-          } else {
-            updateData.quantity = qty;
-          }
-        }
-
-        // Handle supplier update
-        if (bulkEditData.supplier) {
-          updateData.supplier = bulkEditData.supplier;
-        }
-
-        // Handle threshold update
-        if (bulkEditData.low_stock_threshold) {
-          updateData.low_stock_threshold = parseInt(bulkEditData.low_stock_threshold);
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          const payload: any = {};
-          if (typeof updateData.quantity !== 'undefined') {
-            payload.quantity = updateData.quantity;
-          }
-          if (typeof updateData.supplier !== 'undefined') {
-            payload.supplier = updateData.supplier;
-          }
-          if (typeof updateData.low_stock_threshold !== 'undefined') {
-            payload.lowStockThreshold = updateData.low_stock_threshold;
-          }
-
-          await api.updateInventoryItem(id, payload);
-        }
+      await api.bulkUpdateInventory({
+        ids: selectedItems,
+        action: bulkEditData.action,
+        ...(bulkEditData.quantity !== '' ? { quantity: Number(bulkEditData.quantity) } : {}),
+        ...(bulkEditData.supplier ? { supplier: bulkEditData.supplier } : {}),
+        ...(bulkEditData.low_stock_threshold !== '' ? { lowStockThreshold: Number(bulkEditData.low_stock_threshold) } : {}),
+        versions: Object.fromEntries(inventory.filter(item => selectedItems.includes(item.id)).map(item => [item.id, item.version])),
       });
 
-      await Promise.all(updates);
-      
       toast({
         title: "Success",
         description: `Updated ${selectedItems.length} items`,
@@ -841,9 +810,12 @@ export default function InventoryNew() {
       console.error('Bulk update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update items",
+        description: error instanceof Error ? error.message : "Failed to update items",
         variant: "destructive"
       });
+    } finally {
+      bulkSavingRef.current = false;
+      setBulkSaving(false);
     }
   };
 
@@ -1784,7 +1756,7 @@ export default function InventoryNew() {
         </DialogContent>
       </Dialog>
       {/* Bulk Edit Dialog */}
-      <Dialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen}>
+      <Dialog open={bulkEditDialogOpen} onOpenChange={open => { if (!bulkSaving) setBulkEditDialogOpen(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Bulk Edit {selectedItems.length} Items</DialogTitle>
@@ -1868,7 +1840,7 @@ export default function InventoryNew() {
               <Button 
                 onClick={handleBulkUpdate}
                 className="flex-1"
-                disabled={!bulkEditData.quantity && !bulkEditData.supplier && !bulkEditData.low_stock_threshold}
+                disabled={bulkSaving || (!bulkEditData.quantity && !bulkEditData.supplier && !bulkEditData.low_stock_threshold)}
               >
                 Update {selectedItems.length} Items
               </Button>

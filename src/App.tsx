@@ -19,7 +19,7 @@ import Login from "./pages/login";
 const queryClient = new QueryClient();
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionError, retrySession, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -30,6 +30,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (sessionError) {
+    return <div className="mx-auto max-w-md p-8 space-y-4" role="alert"><p>{sessionError}</p><button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" onClick={() => void retrySession()}>Try again</button><button className="ml-3 underline" onClick={() => void signOut()}>Sign out</button></div>;
+  }
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
