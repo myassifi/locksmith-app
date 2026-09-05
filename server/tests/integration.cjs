@@ -21,6 +21,8 @@ let port;
 let serverOutput = '';
 
 before(async () => {
+  fs.mkdirSync(path.join(scratch, 'uploads', 'invoices'), { recursive: true });
+  fs.writeFileSync(path.join(scratch, 'uploads', 'invoices', 'old.pdf'), 'private test invoice');
   execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'db', 'push', '--schema', process.env.TEST_DATABASE_URL ? 'prisma/schema.postgres.prisma' : 'prisma/schema.prisma', '--skip-generate'], { cwd: serverRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: 'pipe' });
   const net = require('node:net');
   const listener = net.createServer();
@@ -210,6 +212,8 @@ test('HTTP login, ownership, input validation, and completion flow', async () =>
   assert.equal((await send(`/api/jobs/${job.id}`, { status: 'cancelled', expectedVersion: job.version }, 'PUT')).status, 200);
   assert.equal(await getStock(item.id), 10);
   assert.equal((await fetch(base + '/uploads/invoices/old.pdf')).status, 404);
+  assert.equal((await fetch(base + '/uploads//invoices/old.pdf')).status, 404);
+  assert.equal((await fetch(base + '/uploads/%69nvoices/old.pdf')).status, 404);
   const profile = await send('/auth/profile', { password: 'new-test-password-only-123' }, 'PUT');
   assert.equal(profile.status, 200);
   assert.equal((await fetch(base + '/auth/me', { headers: { Authorization: `Bearer ${token}` } })).status, 401);

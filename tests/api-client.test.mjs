@@ -28,6 +28,17 @@ test('temporary server errors preserve the session token', async () => {
   assert.equal(api.getToken(), 'saved-session');
 });
 
+test('profile changes update the UI even when the server returns the same token', async () => {
+  api.setToken('unchanged-profile-token');
+  let detail;
+  const handler = event => { detail = event.detail; };
+  window.addEventListener('auth_token_changed', handler);
+  globalThis.fetch = async () => new Response(JSON.stringify({ id: 'owner', businessName: 'Updated name', token: 'unchanged-profile-token' }));
+  await api.updateProfile({ businessName: 'Updated name' });
+  window.removeEventListener('auth_token_changed', handler);
+  assert.equal(detail.user.businessName, 'Updated name');
+});
+
 test('automatic mutation retry reuses the request key', async () => {
   const keys = [];
   globalThis.fetch = async (_url, options) => {

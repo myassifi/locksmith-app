@@ -112,6 +112,10 @@ const upload = multer({ storage: multer.diskStorage({
 } });
 // Historical invoice PDFs must not be served as public uploads.
 app.use('/uploads/invoices', (_req, res) => { res.sendStatus(404); });
+app.use('/uploads', (req, res, next) => {
+  if (!/\.(jpe?g|png|gif|webp)$/i.test(req.path)) return res.sendStatus(404);
+  next();
+});
 app.use('/uploads', express.static(uploadDir, { maxAge: '1d', setHeaders: res => res.setHeader('X-Content-Type-Options', 'nosniff') }));
 app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
