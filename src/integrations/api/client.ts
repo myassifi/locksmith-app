@@ -74,22 +74,31 @@ function mapInventoryFromApi(item: AnyRecord): AnyRecord {
 
 class ApiClient {
   private token: string | null = null;
+  private pendingMutations = new Map<string, string>();
+  private inventoryVersions = new Map<string, number>();
+  private jobVersions = new Map<string, number>();
 
   constructor() {
     this.token = localStorage.getItem('auth_token');
+    window.addEventListener('storage', event => { if (event.key === 'auth_token') this.setToken(event.newValue); });
   }
 
-  setToken(token: string | null) {
+  setToken(token: string | null, user?: unknown) {
     const prevToken = this.token;
     this.token = token;
+    if (prevToken !== token) {
+      this.pendingMutations.clear();
+      this.inventoryVersions.clear();
+      this.jobVersions.clear();
+    }
     if (token) {
       localStorage.setItem('auth_token', token);
     } else {
       localStorage.removeItem('auth_token');
     }
 
-    if (prevToken !== token && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT, { detail: { token } }));
+    if ((prevToken !== token || user) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT, { detail: { token, user } }));
     }
   }
 
@@ -98,52 +107,39 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const requestToken = this.token;
+    const headers = new Headers(options.headers);
+    if (requestToken) headers.set('Authorization', `Bearer ${requestToken}`);
     const isFormData = options.body instanceof FormData;
-    const buildHeaders = (withAuth: boolean): HeadersInit => {
-      const headers: any = {
-        ...(withAuth && this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-        ...options.headers,
-      };
-      
-      if (!isFormData) {
-        headers['Content-Type'] = 'application/json';
-      }
-      
-      return headers;
-    };
-
-    const doFetch = (withAuth: boolean) =>
-      fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers: buildHeaders(withAuth),
-      });
-
-    const response = await doFetch(true);
-
-    // If token is stale/invalid, clear it so the UI can re-auth.
-    if (response.status === 401 && this.token) {
-      this.setToken(null);
+    if (!isFormData) headers.set('Content-Type', 'application/json');
+    const mutation = endpoint.startsWith('/api/') && !isFormData && ['POST', 'PUT', 'DELETE'].includes(options.method || 'GET');
+    const fingerprint = JSON.stringify([requestToken, options.method, endpoint, options.body]);
+    if (mutation) {
+      const key = this.pendingMutations.get(fingerprint) || crypto.randomUUID();
+      this.pendingMutations.set(fingerprint, key);
+      headers.set('Idempotency-Key', key);
     }
-
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < (mutation ? 2 : 1); attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), isFormData ? 60000 : 20000);
+      try {
+        response = await fetch(`${API_URL}${endpoint}`, { ...options, headers, signal: options.signal || controller.signal });
+        break;
+      } catch (error) {
+        if (attempt === (mutation ? 1 : 0)) throw new Error(mutation ? 'Connection interrupted. Retry the same change safely; it will not be applied twice.' : 'Unable to connect. Please try again.');
+      } finally { clearTimeout(timeout); }
+    }
+    if (!response) throw new Error('Unable to connect');
+    if (response.status === 401 && requestToken && this.token === requestToken) this.setToken(null);
     if (!response.ok) {
-      const bodyText = await response.text().catch(() => '');
-      let message = 'Request failed';
-
-      if (bodyText) {
-        try {
-          const parsed = JSON.parse(bodyText);
-          message = parsed?.error || parsed?.message || message;
-        } catch {
-          message = bodyText;
-        }
-      }
-
-      const err = new Error(message);
-      (err as any).status = response.status;
-      throw err;
+      if (mutation && response.status >= 400 && response.status < 500) this.pendingMutations.delete(fingerprint);
+      const body = await response.json().catch(() => ({}));
+      throw Object.assign(new Error(body.error || 'Request failed. Please try again.'), { status: response.status });
     }
-
-    return response.json();
+    const result = response.status === 204 ? undefined : await response.json();
+    if (mutation) this.pendingMutations.delete(fingerprint);
+    return result as T;
   }
 
   // Auth
@@ -152,7 +148,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password, businessName }),
     });
-    this.setToken(data.token);
+    this.setToken(data.token, data.user);
     return data;
   }
 
@@ -161,7 +157,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    this.setToken(data.token);
+    this.setToken(data.token, data.user);
     return data;
   }
 
@@ -170,10 +166,12 @@ class ApiClient {
   }
 
   async updateProfile(data: { businessName?: string; phone?: string; address?: string; password?: string }) {
-    return this.request<any>('/auth/profile', {
+    const user = await this.request<any>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    if (user.token) this.setToken(user.token, user);
+    return user;
   }
 
   logout() {
@@ -216,7 +214,22 @@ class ApiClient {
   // Inventory
   async getInventory() {
     const items = await this.request<any[]>('/api/inventory');
+    for (const item of items) this.inventoryVersions.set(item.id, item.version);
     return (items || []).map(mapInventoryFromApi);
+  }
+
+  async getInventoryMovements(itemId?: string) {
+    const query = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
+    return this.request<any[]>(`/api/inventory-movements${query}`);
+  }
+
+  async adjustInventoryItem(id: string, data: { delta: number; reason: string; note?: string }) {
+    const updated = await this.request<any>(`/api/inventory/${id}/adjust`, {
+      method: 'POST',
+      body: JSON.stringify({ ...data, expectedVersion: this.inventoryVersions.get(id) }),
+    });
+    this.inventoryVersions.set(id, updated.version);
+    return mapInventoryFromApi(updated);
   }
 
   async createInventoryItem(data: any) {
@@ -230,8 +243,9 @@ class ApiClient {
   async updateInventoryItem(id: string, data: any) {
     const updated = await this.request<any>(`/api/inventory/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(mapInventoryToApi(data)),
+      body: JSON.stringify({ expectedVersion: this.inventoryVersions.get(id), ...mapInventoryToApi(data) }),
     });
+    this.inventoryVersions.set(id, updated.version);
     return mapInventoryFromApi(updated);
   }
 
@@ -239,6 +253,10 @@ class ApiClient {
     return this.request<any>(`/api/inventory/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async bulkUpdateInventory(data: { ids: string[]; action: string; quantity?: number; supplier?: string; lowStockThreshold?: number; versions?: Record<string, number> }) {
+    return this.request<{ success: boolean; count: number }>('/api/inventory/bulk', { method: 'POST', body: JSON.stringify(data) });
   }
 
   // Customers
@@ -268,7 +286,9 @@ class ApiClient {
 
   // Jobs
   async getJobs() {
-    return this.request<any[]>('/api/jobs');
+    const jobs = await this.request<any[]>('/api/jobs');
+    for (const job of jobs) this.jobVersions.set(job.id, job.version);
+    return jobs;
   }
 
   async createJob(data: any) {
@@ -281,7 +301,7 @@ class ApiClient {
   async updateJob(id: string, data: any) {
     return this.request<any>(`/api/jobs/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ expectedVersion: this.jobVersions.get(id), ...data }),
     });
   }
 

@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy, Sparkles, MoreHorizontal } from 'lucide-react';
+import { matchesInventorySearch, needsReorder, reorderQuantity } from '@/lib/inventory';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Search, Package2, AlertCircle, RefreshCw, X, DollarSign, TrendingUp, Package, ShoppingCart, ArrowUpDown, Download, AlertTriangle, Grid3x3, List, FileUp, Copy, Sparkles, MoreHorizontal, History } from 'lucide-react';
 import InvoiceUpload from '@/components/invoice/InvoiceUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,12 +19,12 @@ import { api } from '@/integrations/api/client';
 import { useInventorySocket } from '@/hooks/useSocket';
 import { InventoryDataTable } from '@/components/inventory/InventoryDataTable';
 import { InventoryGridCard } from '@/components/inventory/InventoryGridCard';
-import { SwipeableInventoryCard } from '@/components/mobile/SwipeableCard';
 import { PageShell } from '@/components/mobile/PageShell';
 import { InventoryFilters } from '@/components/inventory/InventoryFilters';
 
 interface InventoryItem {
   id: string;
+  version: number;
   item_name?: string;
   sku: string;
   key_type: string;
@@ -49,6 +50,17 @@ interface FilterState {
   priceRange: string;
   stockStatus: string;
   fccId: string;
+}
+
+interface InventoryMovement {
+  id: string;
+  type: string;
+  delta: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  reason?: string;
+  createdAt: string;
+  inventoryItem: { itemName: string; sku?: string };
 }
 
 const PRESET_IMPORT_ITEMS: Array<{ sku: string; description: string; quantity: number }> = [
@@ -156,16 +168,22 @@ export default function InventoryNew() {
   const { user } = useAuth();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const loadedRef = useRef(false);
+  const requestRef = useRef(0);
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'low' | 'out' | 'in-stock' | 'reorder'>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'quantity-high' | 'quantity-low' | 'cost-high' | 'cost-low' | 'low-stock' | 'recently-added'>('name');
-  const [showLowStockAlert, setShowLowStockAlert] = useState(true);
   const [duplicateItem, setDuplicateItem] = useState<InventoryItem | null>(null);
   const [duplicateField, setDuplicateField] = useState<'sku' | 'fcc_id' | null>(null);
   const [bulkEditMode, setBulkEditMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const bulkSavingRef = useRef(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({
     quantity: '',
@@ -182,6 +200,15 @@ export default function InventoryNew() {
   const [cleaningData, setCleaningData] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState('1');
+  const [adjustDirection, setAdjustDirection] = useState<'add' | 'remove'>('add');
+  const [adjustReason, setAdjustReason] = useState('purchased');
+  const [adjustNote, setAdjustNote] = useState('');
+  const [adjustSaving, setAdjustSaving] = useState(false);
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [reorderListOpen, setReorderListOpen] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'all',
@@ -208,16 +235,6 @@ export default function InventoryNew() {
     fcc_id: '',
     low_stock_threshold: '3',
   });
-
-  // Auto-generate item name
-  useEffect(() => {
-    if (formData.make && formData.model && formData.category) {
-      const modelPart = formData.model ? ` ${formData.model}` : '';
-      const yearPart = formData.year_from ? ` ${formData.year_from}` : '';
-      const itemName = `${formData.make}${modelPart}${yearPart} ${formData.category}`;
-      setFormData(prev => ({ ...prev, item_name: itemName }));
-    }
-  }, [formData.make, formData.model, formData.year_from, formData.category]);
 
   // Key Categories
   const keyCategories = [
@@ -282,12 +299,15 @@ export default function InventoryNew() {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    
+    const requestId = ++requestRef.current;
+    if (!loadedRef.current) setLoading(true);
+    setLoadError(false);
     try {
       const data = await api.getInventory();
+      if (requestId !== requestRef.current) return;
       const mapped: InventoryItem[] = (data || []).map((item: any) => ({
         id: item.id,
+        version: item.version,
         item_name: item.itemName || item.sku || '',
         sku: item.sku || '',
         key_type: item.keyType || '',
@@ -306,7 +326,10 @@ export default function InventoryNew() {
         created_at: item.createdAt,
       }));
       setInventory(mapped);
+      loadedRef.current = true;
     } catch (error) {
+      if (requestId !== requestRef.current) return;
+      setLoadError(true);
       console.error('Load error:', error);
       toast({
         title: "Error",
@@ -314,7 +337,7 @@ export default function InventoryNew() {
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   };
 
@@ -334,9 +357,22 @@ export default function InventoryNew() {
       totalItems,
       avgCost,
       uniqueSkus: inventory.length,
-      lowStock: inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3) && i.quantity > 0).length,
+      lowStock: inventory.filter(i => i.quantity <= (i.low_stock_threshold ?? 3) && i.quantity > 0).length,
       outOfStock: inventory.filter(i => i.quantity === 0).length,
     };
+  }, [inventory]);
+
+  const reorderGroups = useMemo(() => {
+    const groups = new Map<string, InventoryItem[]>();
+    inventory.filter(needsReorder).forEach((item) => {
+      const supplier = item.supplier || 'No supplier assigned';
+      groups.set(supplier, [...(groups.get(supplier) || []), item]);
+    });
+    return [...groups.entries()].map(([supplier, items]) => ({
+      supplier,
+      items,
+      estimatedCost: items.reduce((sum, item) => sum + reorderQuantity(item) * (item.cost || 0), 0),
+    })).sort((a, b) => a.supplier.localeCompare(b.supplier));
   }, [inventory]);
 
   const cleanPlan = useMemo(() => {
@@ -436,27 +472,19 @@ export default function InventoryNew() {
 
     // Search filter
     if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.item_name?.toLowerCase().includes(search) ||
-        item.sku?.toLowerCase().includes(search) ||
-        item.fcc_id?.toLowerCase().includes(search) ||
-        item.supplier?.toLowerCase().includes(search) ||
-        item.make?.toLowerCase().includes(search) ||
-        (item as any).model?.toLowerCase().includes(search)
-      );
+      filtered = filtered.filter(item => matchesInventorySearch({ ...item }, searchTerm));
     }
 
     // Tab filter
     if (activeTab !== 'all') {
       filtered = filtered.filter(item => {
-        const threshold = item.low_stock_threshold || 3;
+        const threshold = item.low_stock_threshold ?? 3;
         if (activeTab === 'low') return item.quantity <= threshold && item.quantity > 0;
         if (activeTab === 'out') return item.quantity === 0;
         if (activeTab === 'in-stock') return item.quantity > threshold;
         if (activeTab === 'reorder') {
           // Smart reorder logic: items at or below threshold OR out of stock
-          return item.quantity < threshold;
+          return needsReorder(item);
         }
         return true;
       });
@@ -479,7 +507,8 @@ export default function InventoryNew() {
     }
     if (filters.priceRange !== 'all') {
       filtered = filtered.filter(item => {
-        if (!item.cost) return filters.priceRange === 'none';
+        if (filters.priceRange === 'none') return !item.cost;
+        if (!item.cost) return false;
         const cost = item.cost;
         if (filters.priceRange === 'low') return cost < 10;
         if (filters.priceRange === 'medium') return cost >= 10 && cost <= 50;
@@ -507,10 +536,10 @@ export default function InventoryNew() {
         break;
       case 'low-stock':
         filtered.sort((a, b) => {
-          const aThreshold = a.low_stock_threshold || 3;
-          const bThreshold = b.low_stock_threshold || 3;
-          const aRatio = a.quantity / aThreshold;
-          const bRatio = b.quantity / bThreshold;
+          const aThreshold = a.low_stock_threshold ?? 3;
+          const bThreshold = b.low_stock_threshold ?? 3;
+          const aRatio = a.quantity / Math.max(1, aThreshold);
+          const bRatio = b.quantity / Math.max(1, bThreshold);
           return aRatio - bRatio;
         });
         break;
@@ -528,15 +557,15 @@ export default function InventoryNew() {
 
   // Stats
   const stats = useMemo(() => {
-    const lowStockItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold || 3) && i.quantity > 0);
+    const lowStockItems = inventory.filter(i => i.quantity <= (i.low_stock_threshold ?? 3) && i.quantity > 0);
     const outOfStockItems = inventory.filter(i => i.quantity === 0);
-    const reorderItems = inventory.filter(i => i.quantity < (i.low_stock_threshold || 3));
+    const reorderItems = inventory.filter(needsReorder);
     
     return {
       all: inventory.length,
       low: lowStockItems.length,
       out: outOfStockItems.length,
-      inStock: inventory.filter(i => i.quantity > (i.low_stock_threshold || 3)).length,
+      inStock: inventory.filter(i => i.quantity > (i.low_stock_threshold ?? 3)).length,
       reorder: reorderItems.length,
     };
   }, [inventory]);
@@ -588,6 +617,44 @@ export default function InventoryNew() {
     }
   };
 
+  const openAdjustment = (item: InventoryItem) => {
+    setAdjustingItem(item);
+    setAdjustAmount('1');
+    setAdjustDirection('add');
+    setAdjustReason('purchased');
+    setAdjustNote('');
+  };
+
+  const handleAdjustment = async () => {
+    if (!adjustingItem || adjustSaving) return;
+    const amount = Number(adjustAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      toast({ title: 'Enter a positive whole number', variant: 'destructive' });
+      return;
+    }
+    const delta = adjustDirection === 'add' ? amount : -amount;
+    setAdjustSaving(true);
+    try {
+      await api.adjustInventoryItem(adjustingItem.id, { delta, reason: adjustReason, note: adjustNote.trim() || undefined });
+      toast({ title: 'Stock updated', description: `${adjustingItem.item_name || adjustingItem.sku}: ${delta > 0 ? '+' : ''}${delta}` });
+      setAdjustingItem(null);
+      await loadInventory();
+    } catch (error) {
+      toast({ title: 'Could not adjust stock', description: error instanceof Error ? error.message : 'Please try again', variant: 'destructive' });
+    } finally {
+      setAdjustSaving(false);
+    }
+  };
+
+  const openMovementHistory = async () => {
+    setHistoryOpen(true);
+    try {
+      setMovements(await api.getInventoryMovements());
+    } catch (error) {
+      toast({ title: 'Could not load stock history', description: error instanceof Error ? error.message : 'Please try again', variant: 'destructive' });
+    }
+  };
+
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
     setFormData({
@@ -604,7 +671,7 @@ export default function InventoryNew() {
       year_from: item.year_from?.toString() || '',
       year_to: item.year_to?.toString() || '',
       fcc_id: item.fcc_id || '',
-      low_stock_threshold: (item.low_stock_threshold || 3).toString(),
+      low_stock_threshold: (item.low_stock_threshold ?? 3).toString(),
     });
     setDialogOpen(true);
   };
@@ -624,7 +691,7 @@ export default function InventoryNew() {
       console.error('Delete error:', error);
       toast({
         title: "Error",
-        description: "Failed to delete item",
+        description: error instanceof Error ? error.message : "Failed to delete item",
         variant: "destructive"
       });
     }
@@ -632,21 +699,35 @@ export default function InventoryNew() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingRef.current) return;
 
     // Final duplicate check before submission
-    if (!editingItem && duplicateItem) {
+    if (inventory.some(item => item.id !== editingItem?.id && item.sku.trim().toLowerCase() === formData.sku.trim().toLowerCase())) {
       toast({
         title: "Duplicate Detected",
-        description: `An item with this ${duplicateField === 'sku' ? 'SKU' : 'FCC ID'} already exists. Please update the existing item instead.`,
+        description: 'An item with this SKU already exists. Use a different SKU or edit the existing item.',
         variant: "destructive"
       });
       return;
     }
     
-    setLoading(true);
+    if (!formData.item_name.trim() && !formData.sku.trim()) {
+      toast({ title: 'Item name or SKU required', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isInteger(Number(formData.quantity)) || Number(formData.quantity) < 0 ||
+        !Number.isFinite(Number(formData.cost)) || Number(formData.cost) < 0 ||
+        !Number.isInteger(Number(formData.low_stock_threshold)) || Number(formData.low_stock_threshold) < 0 ||
+        (formData.year_from && formData.year_to && Number(formData.year_from) > Number(formData.year_to))) {
+      toast({ title: 'Check your item details', description: 'Use nonnegative stock and cost values, and an end year after the start year.', variant: 'destructive' });
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
 
     try {
       const itemData = {
+        ...(editingItem ? { expectedVersion: editingItem.version } : {}),
         itemName: formData.item_name || formData.sku,
         sku: formData.sku,
         keyType: formData.key_type || null,
@@ -660,7 +741,7 @@ export default function InventoryNew() {
         yearFrom: formData.year_from ? parseInt(formData.year_from) : null,
         yearTo: formData.year_to ? parseInt(formData.year_to) : null,
         fccId: formData.fcc_id || null,
-        lowStockThreshold: parseInt(formData.low_stock_threshold),
+        lowStockThreshold: Number(formData.low_stock_threshold),
       };
 
       if (editingItem) {
@@ -678,11 +759,12 @@ export default function InventoryNew() {
       console.error('Save error:', error);
       toast({
         title: "Error",
-        description: "Failed to save item",
+        description: error instanceof Error ? error.message : "Failed to save item",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -764,7 +846,7 @@ export default function InventoryNew() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedItems.length === filteredInventory.length) {
+    if (filteredInventory.every(item => selectedItems.includes(item.id))) {
       setSelectedItems([]);
     } else {
       setSelectedItems(filteredInventory.map(item => item.id));
@@ -772,55 +854,19 @@ export default function InventoryNew() {
   };
 
   const handleBulkUpdate = async () => {
-    if (selectedItems.length === 0) return;
-
+    if (selectedItems.length === 0 || bulkSavingRef.current) return;
+    bulkSavingRef.current = true;
+    setBulkSaving(true);
     try {
-      const updates = selectedItems.map(async (id) => {
-        const item = inventory.find(i => i.id === id);
-        if (!item) return;
-
-        const updateData: any = {};
-
-        // Handle quantity update
-        if (bulkEditData.quantity) {
-          const qty = parseInt(bulkEditData.quantity);
-          if (bulkEditData.action === 'add') {
-            updateData.quantity = item.quantity + qty;
-          } else if (bulkEditData.action === 'subtract') {
-            updateData.quantity = Math.max(0, item.quantity - qty);
-          } else {
-            updateData.quantity = qty;
-          }
-        }
-
-        // Handle supplier update
-        if (bulkEditData.supplier) {
-          updateData.supplier = bulkEditData.supplier;
-        }
-
-        // Handle threshold update
-        if (bulkEditData.low_stock_threshold) {
-          updateData.low_stock_threshold = parseInt(bulkEditData.low_stock_threshold);
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          const payload: any = {};
-          if (typeof updateData.quantity !== 'undefined') {
-            payload.quantity = updateData.quantity;
-          }
-          if (typeof updateData.supplier !== 'undefined') {
-            payload.supplier = updateData.supplier;
-          }
-          if (typeof updateData.low_stock_threshold !== 'undefined') {
-            payload.lowStockThreshold = updateData.low_stock_threshold;
-          }
-
-          await api.updateInventoryItem(id, payload);
-        }
+      await api.bulkUpdateInventory({
+        ids: selectedItems,
+        action: bulkEditData.action,
+        ...(bulkEditData.quantity !== '' ? { quantity: Number(bulkEditData.quantity) } : {}),
+        ...(bulkEditData.supplier ? { supplier: bulkEditData.supplier } : {}),
+        ...(bulkEditData.low_stock_threshold !== '' ? { lowStockThreshold: Number(bulkEditData.low_stock_threshold) } : {}),
+        versions: Object.fromEntries(inventory.filter(item => selectedItems.includes(item.id)).map(item => [item.id, item.version])),
       });
 
-      await Promise.all(updates);
-      
       toast({
         title: "Success",
         description: `Updated ${selectedItems.length} items`,
@@ -835,9 +881,12 @@ export default function InventoryNew() {
       console.error('Bulk update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update items",
+        description: error instanceof Error ? error.message : "Failed to update items",
         variant: "destructive"
       });
+    } finally {
+      bulkSavingRef.current = false;
+      setBulkSaving(false);
     }
   };
 
@@ -998,7 +1047,7 @@ export default function InventoryNew() {
   return (
     <PageShell
       title="Inventory"
-      subtitle="Smart Inventory Management"
+      subtitle="Find the right key. Know what’s in stock."
       actions={
         <>
           {bulkEditMode && selectedItems.length > 0 ? (
@@ -1053,6 +1102,15 @@ export default function InventoryNew() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => { openMovementHistory(); setMoreActionsOpen(false); }}
+                    className="w-full justify-start gap-2"
+                  >
+                    <History className="h-4 w-4" />
+                    Stock History
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => { exportToCSV(); setMoreActionsOpen(false); }}
                     className="w-full justify-start gap-2"
                     disabled={inventory.length === 0}
@@ -1081,17 +1139,9 @@ export default function InventoryNew() {
                   </Button>
                 </PopoverContent>
               </Popover>
-              <InventoryFilters
-                filters={filters}
-                onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
-                onReset={clearFilters}
-                suppliers={uniqueSuppliers}
-                makes={uniqueMakes}
-                categories={uniqueCategories}
-              />
               <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2 touch-target">
                 <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Item</span>
+                <span>Add item</span>
               </Button>
               <InvoiceUpload onComplete={loadInventory} open={invoiceOpen} onOpenChange={setInvoiceOpen} hideTrigger />
             </>
@@ -1100,73 +1150,19 @@ export default function InventoryNew() {
       }
       tabs={
         <div className="space-y-4">
-          {/* Stats Cards */}
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                <Package className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{inventoryStats.totalItems}</div>
-                <p className="text-xs text-muted-foreground">In stock</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-                <DollarSign className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${inventoryStats.totalValue.toFixed(0)}</div>
-                <p className="text-xs text-muted-foreground">Inventory worth</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-200 dark:border-amber-900">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">{inventoryStats.lowStock}</div>
-                <p className="text-xs text-muted-foreground">Need reorder</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-red-200 dark:border-red-900">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
-                <Package2 className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{inventoryStats.outOfStock}</div>
-                <p className="text-xs text-muted-foreground">Need ordering</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Cost</CardTitle>
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${inventoryStats.avgCost.toFixed(0)}</div>
-                <p className="text-xs text-muted-foreground">Per item</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Unique SKUs</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{inventoryStats.uniqueSkus}</div>
-                <p className="text-xs text-muted-foreground">Total items</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: 'Stocked units', value: inventoryStats.totalItems, detail: `${inventory.length} inventory items` },
+              { label: 'Inventory cost', value: `$${inventoryStats.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, detail: 'At purchase cost' },
+              { label: 'Low stock', value: inventoryStats.lowStock, detail: 'At or below your threshold' },
+              { label: 'Out of stock', value: inventoryStats.outOfStock, detail: 'No units available' },
+            ].map(metric => (
+              <div key={metric.label} className="rounded-xl border bg-card px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{loading ? '—' : metric.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{metric.detail}</p>
+              </div>
+            ))}
           </div>
 
           {/* Reorder Suggestions Banner */}
@@ -1182,14 +1178,18 @@ export default function InventoryNew() {
                   </AlertDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setReorderListOpen(true)} className="bg-white dark:bg-gray-800">
+                    <ShoppingCart className="h-4 w-4 mr-1" />
+                    Review List
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={async () => {
                       try {
                         const reorderList = filteredInventory.map(item => {
-                          const threshold = item.low_stock_threshold || 3;
-                          const need = Math.max(0, threshold - item.quantity);
+                          const threshold = item.low_stock_threshold ?? 3;
+                          const need = reorderQuantity(item);
                           const unitCost = item.cost || 0;
                           return {
                             sku: item.sku,
@@ -1229,11 +1229,11 @@ export default function InventoryNew() {
                         sku: item.sku,
                         name: item.item_name || item.sku,
                         current: item.quantity,
-                        threshold: item.low_stock_threshold || 3,
-                        need: Math.max(0, (item.low_stock_threshold || 3) - item.quantity),
+                        threshold: item.low_stock_threshold ?? 3,
+                        need: reorderQuantity(item),
                         supplier: item.supplier || 'N/A',
                         cost: item.cost || 0,
-                        estimatedCost: Math.max(0, (item.low_stock_threshold || 3) - item.quantity) * (item.cost || 0)
+                        estimatedCost: reorderQuantity(item) * (item.cost || 0)
                       }));
 
                       const csvEscape = (v: unknown) => {
@@ -1263,46 +1263,13 @@ export default function InventoryNew() {
             </Alert>
           )}
 
-          {/* Low Stock Alert Banner */}
-          {activeTab !== 'reorder' && inventoryStats.lowStock > 0 && showLowStockAlert && (
-            <Alert variant="default" className="border-amber-500 bg-amber-50 dark:bg-amber-950">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
-              <div className="flex items-center justify-between flex-1">
-                <div>
-                  <AlertTitle className="text-amber-900 dark:text-amber-100">Low Stock Alert</AlertTitle>
-                  <AlertDescription className="text-amber-800 dark:text-amber-200">
-                    {inventoryStats.lowStock} item{inventoryStats.lowStock > 1 ? 's' : ''} need reordering. 
-                    {inventoryStats.outOfStock > 0 && ` ${inventoryStats.outOfStock} out of stock.`}
-                  </AlertDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActiveTab('low')}
-                    className="bg-white dark:bg-gray-800"
-                  >
-                    View Items
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowLowStockAlert(false)}
-                    className="h-11 w-11 sm:h-8 sm:w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Alert>
-          )}
-
           {/* Search Bar & Sort */}
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
-                placeholder="Search by name, SKU, FCC ID, supplier..."
+                aria-label="Search inventory"
+                placeholder="Search name, SKU, FCC ID or vehicle…"
                 value={searchTerm}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -1316,7 +1283,7 @@ export default function InventoryNew() {
                   // Delay to allow click on suggestion
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
-                className="pl-10"
+                className="pl-10 h-11 bg-card"
               />
               
               {/* Search Suggestions Dropdown */}
@@ -1340,7 +1307,7 @@ export default function InventoryNew() {
                           )}
                         </div>
                         <div className="text-right">
-                          <Badge variant={item.quantity <= (item.low_stock_threshold || 3) ? 'destructive' : 'secondary'}>
+                          <Badge variant={item.quantity <= (item.low_stock_threshold ?? 3) ? 'destructive' : 'secondary'}>
                             Qty: {item.quantity}
                           </Badge>
                         </div>
@@ -1351,6 +1318,14 @@ export default function InventoryNew() {
               )}
             </div>
 
+              <InventoryFilters
+                filters={filters}
+                onFilterChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
+                onReset={clearFilters}
+                suppliers={uniqueSuppliers}
+                makes={uniqueMakes}
+                categories={uniqueCategories}
+              />
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
               <SelectTrigger className="w-[150px] sm:w-[180px]">
                 <ArrowUpDown className="h-4 w-4 mr-1" />
@@ -1373,6 +1348,7 @@ export default function InventoryNew() {
                 variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                 size="sm"
                 className="h-7 px-2"
+                aria-label="Card view"
                 onClick={() => setViewMode('grid')}
               >
                 <Grid3x3 className="h-4 w-4" />
@@ -1381,6 +1357,7 @@ export default function InventoryNew() {
                 variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                 size="sm"
                 className="h-7 px-2"
+                aria-label="Table view"
                 onClick={() => setViewMode('list')}
               >
                 <List className="h-4 w-4" />
@@ -1423,7 +1400,7 @@ export default function InventoryNew() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="w-full justify-start gap-2">
+            <TabsList className="w-full justify-start gap-1 overflow-x-auto h-auto min-h-11 bg-transparent border-b rounded-none p-0 pb-2">
               <TabsTrigger value="all" className="gap-2 whitespace-nowrap shrink-0">
                 All <Badge variant="secondary" className="ml-1 shrink-0">{stats.all}</Badge>
               </TabsTrigger>
@@ -1446,6 +1423,11 @@ export default function InventoryNew() {
       }
     >
       {/* Content */}
+      {loadError && <Alert variant="destructive" className="mb-4"><AlertTitle>Inventory couldn’t refresh</AlertTitle><AlertDescription>Your last loaded items are still shown. <Button variant="link" onClick={loadInventory}>Try again</Button></AlertDescription></Alert>}
+      <div className="flex items-center justify-between text-sm text-muted-foreground pb-3" aria-live="polite">
+        <span>{filteredInventory.length} of {inventory.length} items</span>
+        <span className="hidden sm:inline">Search by vehicle, part or supplier</span>
+      </div>
       {loading ? (
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -1454,12 +1436,12 @@ export default function InventoryNew() {
         </div>
       ) : filteredInventory.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          {searchTerm || activeFiltersCount > 0 ? (
+          {searchTerm || activeFiltersCount > 0 || activeTab !== 'all' ? (
             <>
               <AlertCircle className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No items match your filters</h3>
               <p className="text-muted-foreground mb-4">Try adjusting your search or filters</p>
-              <Button variant="outline" onClick={() => { setSearchTerm(''); clearFilters(); }} className="touch-target">
+              <Button variant="outline" onClick={() => { setSearchTerm(''); clearFilters(); setActiveTab('all'); }} className="touch-target">
                 Clear all filters
               </Button>
             </>
@@ -1482,53 +1464,26 @@ export default function InventoryNew() {
             <div className="mb-4 p-3 bg-muted/50 rounded-lg flex items-center gap-3">
               <input
                 type="checkbox"
-                checked={selectedItems.length === filteredInventory.length}
+                checked={filteredInventory.every(item => selectedItems.includes(item.id))}
                 onChange={toggleSelectAll}
                 className="h-4 w-4 rounded border-gray-300"
               />
               <span className="text-sm font-medium">
-                {selectedItems.length === filteredInventory.length ? 'Deselect All' : 'Select All'}
+                {filteredInventory.every(item => selectedItems.includes(item.id)) ? 'Deselect All' : 'Select All'}
                 {selectedItems.length > 0 && ` (${selectedItems.length} selected)`}
               </span>
             </div>
           )}
 
-          {/* Desktop View - Grid or List */}
-          <div className="hidden lg:block">
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                {filteredInventory.map((item) => (
-                  <InventoryGridCard
-                    key={item.id}
-                    item={item}
-                    showReorderNeed={activeTab === 'reorder'}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
+          {viewMode === 'list' && !bulkEditMode ? (
+            <div className="hidden lg:block"><InventoryDataTable data={filteredInventory} showReorderNeed={activeTab === 'reorder'} onQuantityChange={handleQuantityChange} onEdit={handleEdit} onDelete={handleDelete} /></div>
+          ) : null}
+          <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 ${viewMode === 'list' && !bulkEditMode ? 'lg:hidden' : ''}`}>
+            {filteredInventory.map(item => (
+              <div key={item.id} className="min-w-0">
+                {bulkEditMode && <label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => toggleItemSelection(item.id)} />Select {item.item_name || item.sku}</label>}
+                <InventoryGridCard item={item} showReorderNeed={activeTab === 'reorder'} onEdit={handleEdit} onAdjust={openAdjustment} onDelete={handleDelete} />
               </div>
-            ) : (
-              <InventoryDataTable
-                data={filteredInventory}
-                showReorderNeed={activeTab === 'reorder'}
-                onQuantityChange={handleQuantityChange}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            )}
-          </div>
-
-          {/* Mobile Card View with Swipe Actions */}
-          <div className="space-y-3 lg:hidden">
-            {filteredInventory.map((item) => (
-              <SwipeableInventoryCard
-                key={item.id}
-                item={item}
-                showReorderNeed={activeTab === 'reorder'}
-                onQuantityChange={handleQuantityChange}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
             ))}
           </div>
         </>
@@ -1593,7 +1548,7 @@ export default function InventoryNew() {
       </Dialog>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (saving) return; setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b sm:px-6">
             <DialogTitle className="text-xl">{editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
@@ -1632,14 +1587,14 @@ export default function InventoryNew() {
           <form onSubmit={handleSubmit} className="space-y-0">
             <div className="grid gap-5 px-5 py-5 sm:px-6">
               {/* Section 1: Vehicle Information */}
-              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+              <div className="space-y-4 rounded-xl border bg-card p-4">
                 <h3 className="font-medium flex items-center gap-2 text-foreground">
                   <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">1</div>
                   <span className="text-primary">Vehicle Compatibility</span>
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Make *</Label>
+                    <Label>Make (optional)</Label>
                     <Select value={formData.make} onValueChange={(value) => setFormData({ ...formData, make: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select make" />
@@ -1652,12 +1607,12 @@ export default function InventoryNew() {
                     </Select>
                   </div>
                   <div>
-                    <Label>Model *</Label>
+                    <Label>Model (optional)</Label>
                     <Input
+                      aria-label="Model"
                       value={formData.model}
                       onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                       placeholder="e.g. Civic, F-150"
-                      required
                     />
                   </div>
                 </div>
@@ -1690,19 +1645,20 @@ export default function InventoryNew() {
                   </div>
                 </div>
                 <div>
-                  <Label>Item Name (Auto-generated)</Label>
+                  <Label>Item name</Label>
                   <Input
-                    value={formData.item_name}
+                    aria-label="Item name"
+                      value={formData.item_name}
                     onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
                     placeholder="e.g., Honda Civic 2010 Prox Key"
-                    className="bg-muted"
+                    className="bg-background"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Automatically built from vehicle details</p>
+                  <p className="text-xs text-muted-foreground mt-1">Use a recognizable name. Vehicle details are optional for tools and universal parts.</p>
                 </div>
               </div>
 
               {/* Section 2: Key Details */}
-              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+              <div className="space-y-4 rounded-xl border bg-card p-4">
                 <h3 className="font-medium flex items-center gap-2 text-foreground">
                   <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">2</div>
                   <span className="text-primary">Key Details</span>
@@ -1724,11 +1680,12 @@ export default function InventoryNew() {
                   <div>
                     <Label>FCC ID</Label>
                     <Input
+                      aria-label="FCC ID"
                       value={formData.fcc_id}
                       onChange={(e) => {
                         const value = e.target.value;
                         setFormData({ ...formData, fcc_id: value });
-                        if (value.trim()) checkForDuplicate('fcc_id', value);
+
                       }}
                       placeholder="e.g., KR55WK49303"
                       className={duplicateField === 'fcc_id' ? 'border-destructive' : ''}
@@ -1741,7 +1698,8 @@ export default function InventoryNew() {
                 <div>
                   <Label>Chip Type</Label>
                   <Input
-                    value={formData.key_type}
+                    aria-label="Chip type"
+                      value={formData.key_type}
                     onChange={(e) => setFormData({ ...formData, key_type: e.target.value })}
                     placeholder="e.g., ID46, 4D63, MQB"
                   />
@@ -1749,7 +1707,7 @@ export default function InventoryNew() {
               </div>
 
               {/* Section 3: Inventory Information */}
-              <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm border-l-4 border-l-primary">
+              <div className="space-y-4 rounded-xl border bg-card p-4">
                 <h3 className="font-medium flex items-center gap-2 text-foreground">
                   <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">3</div>
                   <span className="text-primary">Stock & Pricing</span>
@@ -1758,6 +1716,7 @@ export default function InventoryNew() {
                   <div>
                     <Label>SKU *</Label>
                     <Input
+                      aria-label="SKU"
                       value={formData.sku}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -1791,6 +1750,7 @@ export default function InventoryNew() {
                     <Label>Quantity *</Label>
                     <Input
                       type="number"
+                      aria-label="Quantity"
                       value={formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                       required
@@ -1802,6 +1762,7 @@ export default function InventoryNew() {
                     <Input
                       type="number"
                       step="0.01"
+                      aria-label="Unit cost"
                       value={formData.cost}
                       onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                       placeholder="0.00"
@@ -1811,6 +1772,7 @@ export default function InventoryNew() {
                     <Label>Low Stock</Label>
                     <Input
                       type="number"
+                      aria-label="Low stock threshold"
                       value={formData.low_stock_threshold}
                       onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
                       min="0"
@@ -1821,14 +1783,114 @@ export default function InventoryNew() {
             </div>
 
             <div className="sticky bottom-0 flex gap-3 border-t bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 touch-target">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={saving} className="flex-1 touch-target">
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 touch-target">
-                {editingItem ? 'Update Item' : 'Add Item'}
+              <Button type="submit" className="flex-1 touch-target" disabled={saving}>
+                {saving ? 'Saving…' : editingItem ? 'Update Item' : 'Add Item'}
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reorderListOpen} onOpenChange={setReorderListOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Supplier Reorder List</DialogTitle>
+            <DialogDescription>Grouped by supplier so you can place orders quickly. Use Receive stock when an order arrives.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            {reorderGroups.map((group) => (
+              <section key={group.supplier} className="rounded-xl border">
+                <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-3">
+                  <div><h3 className="font-semibold">{group.supplier}</h3><p className="text-xs text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'} · est. ${group.estimatedCost.toFixed(2)}</p></div>
+                </div>
+                <div className="divide-y">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 p-4">
+                      <div className="min-w-0"><p className="font-medium truncate">{item.item_name || item.sku}</p><p className="text-xs text-muted-foreground">{item.sku || 'No SKU'} · {item.quantity} on hand · order {reorderQuantity(item)}</p></div>
+                      <Button size="sm" variant="outline" onClick={() => { setReorderListOpen(false); openAdjustment(item); }}>Receive stock</Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!adjustingItem} onOpenChange={(open) => { if (!open && !adjustSaving) setAdjustingItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adjust Stock</DialogTitle>
+            <DialogDescription>{adjustingItem?.item_name || adjustingItem?.sku} · {adjustingItem?.quantity ?? 0} currently on hand</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Direction</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <Button type="button" variant={adjustDirection === 'add' ? 'default' : 'outline'} onClick={() => { setAdjustDirection('add'); setAdjustReason('purchased'); }}>Add stock</Button>
+                <Button type="button" variant={adjustDirection === 'remove' ? 'default' : 'outline'} onClick={() => { setAdjustDirection('remove'); setAdjustReason('used'); }}>Remove stock</Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="adjust-amount">Quantity</Label>
+              <Input id="adjust-amount" type="number" min="1" step="1" value={adjustAmount} onChange={(event) => setAdjustAmount(event.target.value)} />
+            </div>
+            <div>
+              <Label>Reason</Label>
+              <Select value={adjustReason} onValueChange={setAdjustReason}>
+                <SelectTrigger aria-label="Adjustment reason"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {adjustDirection === 'add' ? <>
+                    <SelectItem value="purchased">Purchased</SelectItem>
+                    <SelectItem value="returned">Customer return</SelectItem>
+                    <SelectItem value="correction">Count correction</SelectItem>
+                  </> : <>
+                    <SelectItem value="used">Used outside a job</SelectItem>
+                    <SelectItem value="damaged">Damaged or lost</SelectItem>
+                    <SelectItem value="correction">Count correction</SelectItem>
+                  </>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="adjust-note">Note (optional)</Label>
+              <Input id="adjust-note" value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} placeholder="Invoice, supplier, or explanation" />
+            </div>
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              New quantity: <span className="font-semibold">{Math.max(0, (adjustingItem?.quantity ?? 0) + (adjustDirection === 'add' ? Number(adjustAmount || 0) : -Number(adjustAmount || 0)))}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setAdjustingItem(null)} disabled={adjustSaving}>Cancel</Button>
+              <Button className="flex-1" onClick={handleAdjustment} disabled={adjustSaving}>{adjustSaving ? 'Saving…' : 'Save adjustment'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Stock Movement History</DialogTitle>
+            <DialogDescription>Purchases, corrections, job usage, and restored stock.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {movements.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No stock movements recorded yet.</p> : movements.map((movement) => (
+              <div key={movement.id} className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{movement.inventoryItem.itemName || movement.inventoryItem.sku || 'Inventory item'}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{movement.type.replace(/_/g, ' ')} · {movement.reason || 'No note'}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(movement.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`font-semibold tabular-nums ${movement.delta > 0 ? 'text-emerald-600' : 'text-destructive'}`}>{movement.delta > 0 ? '+' : ''}{movement.delta}</p>
+                  <p className="text-xs text-muted-foreground">{movement.quantityBefore} → {movement.quantityAfter}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1878,7 +1940,7 @@ export default function InventoryNew() {
         </DialogContent>
       </Dialog>
       {/* Bulk Edit Dialog */}
-      <Dialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen}>
+      <Dialog open={bulkEditDialogOpen} onOpenChange={open => { if (!bulkSaving) setBulkEditDialogOpen(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Bulk Edit {selectedItems.length} Items</DialogTitle>
@@ -1962,7 +2024,7 @@ export default function InventoryNew() {
               <Button 
                 onClick={handleBulkUpdate}
                 className="flex-1"
-                disabled={!bulkEditData.quantity && !bulkEditData.supplier && !bulkEditData.low_stock_threshold}
+                disabled={bulkSaving || (!bulkEditData.quantity && !bulkEditData.supplier && !bulkEditData.low_stock_threshold)}
               >
                 Update {selectedItems.length} Items
               </Button>

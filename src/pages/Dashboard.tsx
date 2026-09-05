@@ -765,7 +765,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your business performance</p>
+          <p className="text-muted-foreground">Today’s work, stock alerts, and business performance</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <Input
@@ -899,6 +899,35 @@ export default function Dashboard() {
             <Users className="h-4 w-4" />
             View Customers
           </Button>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between px-1">
+          <div>
+            <h2 className="text-lg font-semibold">Today</h2>
+            <p className="text-sm text-muted-foreground">The work that needs attention first</p>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => navigateToJobs({ status: 'pending' })} role="button" tabIndex={0}>
+            <CardContent className="flex items-center justify-between p-5">
+              <div><p className="text-sm text-muted-foreground">Pending jobs</p><p className="mt-1 text-3xl font-semibold">{data.jobs.pending}</p><p className="mt-1 text-xs text-muted-foreground">Waiting to be started</p></div>
+              <Clock className="h-8 w-8 text-amber-500" />
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => navigateToJobs({ status: 'in_progress' })} role="button" tabIndex={0}>
+            <CardContent className="flex items-center justify-between p-5">
+              <div><p className="text-sm text-muted-foreground">In progress</p><p className="mt-1 text-3xl font-semibold">{data.jobs.inProgress}</p><p className="mt-1 text-xs text-muted-foreground">Active work</p></div>
+              <Briefcase className="h-8 w-8 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => navigate('/inventory')} role="button" tabIndex={0}>
+            <CardContent className="flex items-center justify-between p-5">
+              <div><p className="text-sm text-muted-foreground">Stock alerts</p><p className="mt-1 text-3xl font-semibold">{data.reminders.lowStock.length}</p><p className="mt-1 text-xs text-muted-foreground">At or below reorder level</p></div>
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -1104,7 +1133,14 @@ export default function Dashboard() {
             <CardDescription>Last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
+            {data.monthlyIncomeSeries.every(month => month.amount === 0) ? (
+              <div className="flex h-[250px] flex-col items-center justify-center p-6 text-center">
+                <TrendingUp className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                <h3 className="font-semibold">Monthly trend will appear here</h3>
+                <p className="mt-1 max-w-xs text-sm text-muted-foreground">Complete your first paid job to start tracking revenue over time.</p>
+                <Button className="mt-4" size="sm" onClick={() => navigate('/jobs?new=true')}>Create a job</Button>
+              </div>
+            ) : <ResponsiveContainer width="100%" height={250}>
               <BarChart data={data.monthlyIncomeSeries}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" tick={{ fill: 'currentColor' }} />
@@ -1124,7 +1160,7 @@ export default function Dashboard() {
                 />
                 <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[8,8,0,0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer>}
           </CardContent>
         </Card>
 
@@ -1192,7 +1228,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Monthly Profit Analysis Table */}
+            {data.jobs.completed > 0 ? <>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -1281,6 +1317,13 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
+            </> : (
+              <div className="rounded-lg border border-dashed p-6 text-center">
+                <TrendingUp className="mx-auto mb-3 h-9 w-9 text-muted-foreground/50" />
+                <h3 className="font-semibold">Profit reporting starts with your first completed job</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Inventory investment is ready. Complete a job to see material cost, revenue, profit, and margin here.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

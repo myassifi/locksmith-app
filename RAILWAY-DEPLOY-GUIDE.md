@@ -1,3 +1,5 @@
+> Before deploying the stock workflow changes, follow [STOCK-WORKFLOW.md](STOCK-WORKFLOW.md), including the backup, secret, schema, and staging steps.
+
 # 🚂 Railway Deployment Guide - Heat Wave Locksmith App
 
 **Easy deployment for beginners - No SSH needed!**
@@ -183,7 +185,7 @@ Now that you have your frontend URL, update backend CORS:
 1. **Open your frontend URL** in browser
 2. **Login:**
    - Email: `m.yassifi@gmail.com`
-   - Password: `demo1234`
+   - Password: your existing strong password. No default password is created.
 
 ✅ **Your app is live!**
 
