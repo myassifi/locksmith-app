@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
-    "start": "prisma db push --schema prisma/schema.postgres.prisma && node dist/index.js",
+    "start": "node scripts/deploy-database.cjs && node dist/index.js",
     "railway:build": "prisma generate --schema prisma/schema.postgres.prisma && tsc",
-    "railway:start": "(prisma migrate deploy --schema prisma/schema.postgres.prisma || prisma db push --schema prisma/schema.postgres.prisma) && node dist/index.js",
+    "railway:start": "node scripts/deploy-database.cjs && node dist/index.js",
     "test": "prisma generate --schema prisma/schema.prisma && tsc && node --test tests/integration.cjs",
     "test:postgres": "prisma generate --schema prisma/schema.postgres.prisma && tsc && node --test tests/integration.cjs",
     "create-user": "node scripts/create-user.cjs"
@@ -20,15 +20,15 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^6.19.1",
+    "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "multer": "^2.0.2",
+    "multer": "^2.3.0",
     "pdf-parse": "^2.4.5",
-    "prisma": "^6.19.1",
-    "socket.io": "^4.8.1"
+    "prisma": "^6.19.3",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
